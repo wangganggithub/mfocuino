@@ -47,7 +47,6 @@
 #include "crapto1.h"
 
 // Internal
-#include "config.h"
 #include "mifare.h"
 #include "nfc-utils.h"
 #include "mfoc.h"
