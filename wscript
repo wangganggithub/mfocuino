@@ -162,7 +162,7 @@ def configure(conf):
 	conf.env.DEFINES = ['F_CPU=%s' % conf.env.F_CPU, 'USB_VID=null', 'USB_PID=null', 'ARDUINO=101'] #todo get the version of the arduino ide
 	conf.env.LINKFLAGS = ['-Wl,--gc-sections', '-mmcu=%s' % conf.env.MCU]
 	
-	
+	conf.env.INCLUDES += ['libraries']
 	conf.env.ARDUINO_SRC_CORE = glob.glob('%s/hardware/arduino/cores/arduino/*.c' % Options.options.idepath)
 	conf.env.ARDUINO_SRC_CORE += glob.glob('%s/hardware/arduino/cores/arduino/*.cpp' % Options.options.idepath)
 	
@@ -175,12 +175,13 @@ def build(bld):
 	bld(features='c cxx cxxstlib', source=core, target='core', lib='m')
 
 	#build arduino user project
-	src = bld.path.ant_glob(['src/**/*.pde', 'src/**/*.c', 'src/**/*.cpp'])
-	bld(features='c cxx cxxprogram',
-		source=src, 
-		target='test.elf',
-		lib='m',
-		use='core',
+	src = bld.path.ant_glob(['src/**/*.pde', 'src/**/*.c', 'src/**/*.cpp', 'libraries/PN532/*.cpp'])
+	bld(features = 'c cxx cxxprogram',
+		includes = 'src',
+		source = src, 
+		target = 'test.elf',
+		lib = 'm',
+		use = 'core',
 	)
 	
 def openSerial(ctx):
