@@ -156,7 +156,7 @@ def configure(conf):
 		conf.msg('Arduino ', 'Mega 2650')
 	
 	
-	flags = ['-g', '-Os' , '-w' , '-Wall', '-fno-exceptions', '-ffunction-sections' , '-fdata-sections', '-mmcu=%s' % conf.env.MCU, '-MMD']
+	flags = ['-g', '-Os' , '-w' , '-Wall', '-std=c99', '-fno-exceptions', '-ffunction-sections' , '-fdata-sections', '-mmcu=%s' % conf.env.MCU, '-MMD']
 	conf.env.CFLAGS = flags
 	conf.env.CXXFLAGS = flags
 	conf.env.DEFINES = ['F_CPU=%s' % conf.env.F_CPU, 'USB_VID=null', 'USB_PID=null', 'ARDUINO=101'] #todo get the version of the arduino ide
