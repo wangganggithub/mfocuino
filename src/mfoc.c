@@ -52,7 +52,7 @@
 #include "nfc-utils.h"
 #include "mfoc.h"
 
-int main(int argc, char * const argv[]) {
+int mfocmain(uint32_t id) {
 	const nfc_modulation nm = {
 		.nmt = NMT_ISO14443A,
 		.nbr = NBR_106,
@@ -109,66 +109,6 @@ int main(int argc, char * const argv[]) {
  	static mifare_classic_tag mtDump;
 
 	mifare_cmd mc;
-	FILE *pfDump = NULL;
-
-	// Parse command line arguments
-	while ((ch = getopt(argc, argv, "hD:s:BP:T:S:O:k:t:")) != -1) {
-		switch (ch) {
-			case 'P':
-				// Number of probes
-				if (!(probes = atoi(optarg)) || probes < 1) {
-					ERR ("The number of probes must be a positive number");
-					exit (EXIT_FAILURE);
-				}
-				// fprintf(stdout, "Number of probes: %d\n", probes);
-				break;
-			case 'T':
-			{
-				int res;
-				// Nonce tolerance range
-				if (((res = atoi(optarg)) != 0) || (res < 0)) {
-					ERR ("The nonce distances range must be a zero or a positive number");
-					exit (EXIT_FAILURE);
-				}
-				d.tolerance = (uint32_t)res;
-				// fprintf(stdout, "Tolerance number: %d\n", probes);
-			}
-				break;
-			case 'k':
-				// Add this key to the default keys
-				p = realloc(defKeys, defKeys_len + 6);
-				if (!p) {
-					ERR ("Cannot allocate memory for defKeys");
-					exit (EXIT_FAILURE);
-				}
-				defKeys = p;
-				memset(defKeys+defKeys_len, 0, 6);
-				num_to_bytes(strtoll(optarg, NULL, 16), 6, defKeys+defKeys_len);
-				fprintf(stdout, "The custom key 0x%012llx has been added to the default keys\n", bytes_to_num(defKeys+defKeys_len, 6));
-				defKeys_len = defKeys_len + 6;
-
-				break;
-			case 'O':
-				// File output
-				if (!(pfDump = fopen(optarg, "wb"))) {
-					fprintf(stderr, "Cannot open: %s, exiting\n", optarg);
-					exit (EXIT_FAILURE);
-				}
-				// fprintf(stdout, "Output file: %s\n", optarg);
-				break;
-			case 'h':
-				usage(stdout, 0);
-				break;
-			default:
-				usage(stderr, 1);
-				break;
-		}
-	}
-
-	if (!pfDump) {
-		ERR ("parameter -O is mandatory");
-		exit (EXIT_FAILURE);
-	}
 
 	// Initialize reader/tag structures
 	mf_init(&r);
@@ -525,27 +465,6 @@ error:
     exit (EXIT_FAILURE);
 }
 
-void usage(FILE * stream, int errno) {
-	fprintf(stream, "Usage: mfoc [-h] [-k key]... [-P probnum] [-T tolerance] [-O output]\n");
-	fprintf(stream, "\n");
-	fprintf(stream, "  h     print this help and exit\n");
-//	fprintf(stream, "  B     instead of 'A' dump 'B' keys\n");
-	fprintf(stream, "  k     try the specified key in addition to the default keys\n");
-//	fprintf(stream, "  D     number of distance probes, default is 20\n");
-//	fprintf(stream, "  S     number of sets with keystreams, default is 5\n");
-	fprintf(stream, "  P     number of probes per sector, instead of default of 20\n");
-	fprintf(stream, "  T     nonce tolerance half-range, instead of default of 20\n        (i.e., 40 for the total range, in both directions)\n");
-//	fprintf(stream, "  s     specify the list of sectors to crack, for example -s 0,1,3,5\n");
-	fprintf(stream, "  O     file in which the card contents will be written (REQUIRED)\n");
-	fprintf(stream, "\n");
-	fprintf(stream, "Example: mfoc -O mycard.mfd\n");
-	fprintf(stream, "Example: mfoc -k ffffeeeedddd -O mycard.mfd\n");
-	fprintf(stream, "Example: mfoc -P 50 -T 30 -O mycard.mfd\n");
-	fprintf(stream, "\n");
-	fprintf(stream, "This is mfoc version %s.\n", PACKAGE_VERSION);
-	fprintf(stream, "For more information, run: 'man mfoc'.\n");
-	exit(errno);
-}
 
 void mf_init(mfreader *r) {
 	// Connect to the first NFC device
