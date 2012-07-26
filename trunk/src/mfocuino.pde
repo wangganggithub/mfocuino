@@ -1,5 +1,7 @@
 #include <PN532.h>
 
+#include "mfoc.h"
+
 #define SCK 13
 #define MOSI 11
 #define SS 10
@@ -38,7 +40,7 @@ void loop(void) {
         Serial.println(id);
         Serial.println();
 
-	//todo ... :)
+		mfocmain(id);
     }
     delay(500);
 }
