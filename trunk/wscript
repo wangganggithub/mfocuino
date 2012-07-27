@@ -5,7 +5,7 @@
 top = '.'
 out = 'build'
 
-import os, sys, glob, serial
+import os, sys, platform, serial
 
 from waflib import Task, Options, Logs
 from waflib.TaskGen import feature, after
@@ -147,9 +147,13 @@ def configure(conf):
 	relIncPath = ['hardware/arduino/cores/arduino/', 'hardware/arduino/variants/standard/']
 	
 	if os.path.exists(Options.options.idepath):
-		conf.env.ARDUINO_PATH = Options.options.idepath
+		conf.env.ARDUINO_PATH = os.path.abspath(Options.options.idepath)
 	else:
-		conf.env.ARDUINO_PATH = '/usr/share/arduino'
+		if platform.system() == "Windows":
+			conf.fatal('you have to specify the arduino ide installation path with --path')
+		else:
+			#try package installation ... (will work on ubuntu ...)
+			conf.env.ARDUINO_PATH = '/usr/share/arduino'
 		
 	for p in relBinPath:
 		path = os.path.abspath(conf.env.ARDUINO_PATH + '/' + p)
@@ -204,19 +208,23 @@ def configure(conf):
 	conf.env.LINKFLAGS = ['-Wl,--gc-sections', '-mmcu=%s' % conf.env.ARDUINO['build.mcu']]
 	
 	conf.env.INCLUDES += ['libraries']
-	conf.env.ARDUINO_SRC_CORE = glob.glob('%s/hardware/arduino/cores/arduino/*.c' % Options.options.idepath)
-	conf.env.ARDUINO_SRC_CORE += glob.glob('%s/hardware/arduino/cores/arduino/*.cpp' % Options.options.idepath)
+	conf.env.INCLUDES += ['%s/libraries' % conf.env.ARDUINO_PATH]
 	
-
+def buildArduinoCore(bld):
+	#build arduino core library
+	node = bld.root.ant_glob([
+		'%s/hardware/arduino/cores/arduino/*.c' % bld.env.ARDUINO_PATH[1:],
+		'%s/hardware/arduino/cores/arduino/*.cpp' % bld.env.ARDUINO_PATH[1:],
+		#add extra libraries if needed ...
+		])
+	bld(features='c cxx cxxstlib', source=node, target='core', lib='m')      
 
 def build(bld):
 	#build arduino core library
-	#todo build the core library from anywhere ...
-	core = bld.path.ant_glob(['ext/arduino-1.0.1/hardware/arduino/cores/arduino/*.c', 'ext/arduino-1.0.1/hardware/arduino/cores/arduino/*.cpp'])
-	bld(features='c cxx cxxstlib', source=core, target='core', lib='m')
+	bld.add_pre_fun(buildArduinoCore)
 
-	#build arduino user project
-	src = bld.path.ant_glob(['src/**/*.pde', 'src/**/*.c', 'src/**/*.cpp', 'libraries/PN532/*.cpp'])
+	#build arduino project
+	src = bld.path.ant_glob(['src/**/*.pde', 'src/**/*.c', 'src/**/*.cpp', 'libraries/**/*.cpp'])
 	bld(features = 'c cxx cxxprogram',
 		includes = 'src',
 		source = src, 
@@ -225,7 +233,9 @@ def build(bld):
 		use = 'core',
 	)
 	
-def openSerial(ctx):
+def monitor(ctx):
+	"""Start `screen` on the serial device.  This is meant to be an equivalent to the Arduino serial monitor."""
+	#todo
 	#wait serial is available
 	try:
 		#ser = serial.Serial("/dev/ttyACM0", 115200)
