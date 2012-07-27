@@ -34,50 +34,30 @@
  */
 
 #ifndef _EXAMPLES_NFC_UTILS_H_
-#  define _EXAMPLES_NFC_UTILS_H_
+#define _EXAMPLES_NFC_UTILS_H_
 
-#  include <stdlib.h>
-#  include <string.h>
-#  include <err.h>
+#include <stdlib.h>
+#include <string.h>
+#include <err.h>
 
 /**
  * @macro DBG
  * @brief Print a message of standard output only in DEBUG mode
  */
-#ifdef DEBUG
-#  define DBG(...) do { \
-    warnx ("DBG %s:%d", __FILE__, __LINE__); \
-    warnx ("    " __VA_ARGS__ ); \
-  } while (0)
-#else
-#  define DBG(...) {}
-#endif
+#define DBG(...)
 
 /**
  * @macro WARN
  * @brief Print a warn message
  */
-#ifdef DEBUG
-#  define WARN(...) do { \
-    warnx ("WARNING %s:%d", __FILE__, __LINE__); \
-    warnx ("    " __VA_ARGS__ ); \
-  } while (0)
-#else
-#  define WARN(...) warnx ("WARNING: " __VA_ARGS__ )
-#endif
+#define WARN(...)
 
 /**
  * @macro ERR
  * @brief Print a error message
  */
-#ifdef DEBUG
-#  define ERR(...) do { \
-    warnx ("ERROR %s:%d", __FILE__, __LINE__); \
-    warnx ("    " __VA_ARGS__ ); \
-  } while (0)
-#else
-#  define ERR(...)  warnx ("ERROR: " __VA_ARGS__ )
-#endif
+#define ERR(...)
+
 
 uint8_t  oddparity (const uint8_t bt);
 void    oddparity_uint8_ts (const uint8_t *pbtData, const size_t szLen, uint8_t *pbtPar);

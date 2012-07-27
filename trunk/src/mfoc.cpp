@@ -51,12 +51,15 @@
 #include "nfc-utils.h"
 #include "mfoc.h"
 
+#include <HardwareSerial.h>
+
 int mfocmain(uint32_t id) {
-	const nfc_modulation nm = {
+	/*const nfc_modulation nm = {
 		.nmt = NMT_ISO14443A,
 		.nbr = NBR_106,
-	};
-
+	};*/
+	const nfc_modulation nm = { /*.nmt = */ NMT_ISO14443A, /*.nbr = */ NBR_106 };
+	
 	int ch, i, k, n, j, m;
 	int key, block;
 	int succeed = 1;
@@ -74,7 +77,8 @@ int mfocmain(uint32_t id) {
 	// Next default key specified as option (-k)
 	uint8_t * defKeys = NULL, *p;
 	size_t defKeys_len = 0;
-
+	size_t defKey_bytes_todo = defKeys_len;
+	
 	// Array with default Mifare Classic keys
 	uint8_t defaultKeys[][6] = {
 		{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}, // Default key (first key used by program if no user defined key)
@@ -160,16 +164,16 @@ int mfocmain(uint32_t id) {
 	t.num_blocks = (t.b4K) ? 0xff : 0x3f;
 	t.num_sectors = t.b4K ? NR_TRAILERS_4k : NR_TRAILERS_1k;
 
-	t.sectors = (void *) calloc(t.num_sectors, sizeof(sector));
+	t.sectors = (sector*) calloc(t.num_sectors, sizeof(sector));
 	if (t.sectors == NULL) {
 		ERR ("Cannot allocate memory for t.sectors");
 		goto error;
 	}
-	if ((pk = (void *) malloc(sizeof(pKeys))) == NULL) {
+	if ((pk = (pKeys*) malloc(sizeof(pKeys))) == NULL) {
 		ERR ("Cannot allocate memory for pk");
 		goto error;
 	}
-	if ((bk = (void *) malloc(sizeof(bKeys))) == NULL) {
+	if ((bk = (bKeys*) malloc(sizeof(bKeys))) == NULL) {
 		ERR ("Cannot allocate memory for bk");
 		goto error;
 	} else {
@@ -177,12 +181,12 @@ int mfocmain(uint32_t id) {
 		bk->size = 0;
 	}
 
-	d.distances = (void *) calloc(d.num_distances, sizeof(uint32_t));
+	d.distances = (uint32_t*) calloc(d.num_distances, sizeof(uint32_t));
 	if (d.distances == NULL) {
 		ERR ("Cannot allocate memory for t.distances");
 		goto error;
 	}
-
+	
 	// Initialize t.sectors, keys are not known yet
 	for (uint8_t s = 0; s < (t.num_sectors); ++s) {
 		t.sectors[s].foundKeyA = t.sectors[s].foundKeyB = false;
@@ -195,8 +199,8 @@ int mfocmain(uint32_t id) {
 	memcpy(mp.mpa.abtAuthUid, t.nt.nti.nai.abtUid + t.nt.nti.nai.szUidLen - 4, sizeof(mp.mpa.abtAuthUid));
 	// Iterate over all keys (n = number of keys)
 	n = sizeof(defaultKeys)/sizeof(defaultKeys[0]);
-	size_t defKey_bytes_todo = defKeys_len;
 	key = 0;
+	
 	while (key < n) {
 		if (defKey_bytes_todo > 0) {
 			memcpy(mp.mpa.abtKey, defKeys + defKeys_len - defKey_bytes_todo, sizeof(mp.mpa.abtKey));
@@ -278,7 +282,7 @@ int mfocmain(uint32_t id) {
 				skip = false;
 				for (uint32_t o = 0; o < bk->size; o++) {
 					num_to_bytes(bk->brokenKeys[o], 6, mp.mpa.abtKey);
-					mc = dumpKeysA ? 0x60 : 0x61;
+					mc = (mifare_cmd)(dumpKeysA ? 0x60 : 0x61);
 					if (!nfc_initiator_mifare_cmd(r.pdi,mc,t.sectors[j].trailer,&mp)) {
 					//	fprintf(stdout, "!!Error: AUTH [Key A:%012llx] sector %02x t_block %02x, key %d\n",
 					//			bytes_to_num(mp.mpa.abtKey, 6), j, t.sectors[j].trailer, o);
@@ -333,7 +337,7 @@ int mfocmain(uint32_t id) {
 							// fprintf(stdout,"%d %llx\n",ck[i].count, ck[i].key);
 							// Set required authetication method
 							num_to_bytes(ck[i].key, 6, mp.mpa.abtKey);
-							mc = dumpKeysA ? 0x60 : 0x61;
+							mc = (mifare_cmd)(dumpKeysA ? 0x60 : 0x61);
 							if (!nfc_initiator_mifare_cmd(r.pdi,mc,t.sectors[j].trailer,&mp)) {
 								// fprintf(stdout, "!!Error: AUTH [Key A:%llx] sector %02x t_block %02x\n",
 								// 	bytes_to_num(mp.mpa.abtKey, 6), j, t.sectors[j].trailer);
@@ -438,13 +442,8 @@ int mfocmain(uint32_t id) {
 			memcpy(mp.mpa.abtAuthUid, t.nt.nti.nai.abtUid + t.nt.nti.nai.szUidLen - 4, sizeof(mp.mpa.abtAuthUid));
 		}
 
-		// Finally save all keys + data to file
-		if (fwrite(&mtDump, 1, sizeof(mtDump), pfDump) != sizeof(mtDump)) {
-			fprintf(stdout, "Error, cannot write dump\n");
-			fclose(pfDump);
-			goto error;
-		}
-		fclose(pfDump);
+		// Finally save all keys + data to file (Serial instead)
+		Serial.write((uint8_t*)&mtDump, sizeof(mtDump));
 	}
 
 	free(t.sectors);
@@ -458,6 +457,7 @@ int mfocmain(uint32_t id) {
 	nfc_close(r.pdi);
     nfc_exit(NULL);
     exit (EXIT_SUCCESS);
+	
 error:
     nfc_close(r.pdi);
     nfc_exit(NULL);
@@ -508,10 +508,12 @@ void mf_configure(nfc_device* pdi) {
 
 void mf_select_tag(nfc_device* pdi, nfc_target* pnt) {
 	// Poll for a ISO14443A (MIFARE) tag
-	const nfc_modulation nm = {
+	/*const nfc_modulation nm = {
 		.nmt = NMT_ISO14443A,
 		.nbr = NBR_106,
-	};
+	};*/
+	const nfc_modulation nm = { /*.nmt = */ NMT_ISO14443A, /*.nbr = */ NBR_106 };
+	
 	if (nfc_initiator_select_passive_target(pdi, nm, NULL, 0, pnt) < 0) {
 		ERR ("Unable to connect to the MIFARE Classic tag");
 		nfc_close(pdi);
@@ -552,10 +554,12 @@ int find_exploit_sector(mftag t) {
 }
 
 void mf_anticollision(mftag t, mfreader r) {
-	const nfc_modulation nm = {
+	/*const nfc_modulation nm = {
 		.nmt = NMT_ISO14443A,
 		.nbr = NBR_106,
-	};
+	};*/
+	const nfc_modulation nm = { /*.nmt = */ NMT_ISO14443A, /*.nbr = */ NBR_106 };
+	
 	if (nfc_initiator_select_passive_target(r.pdi, nm, NULL, 0, &t.nt) < 0) {
 		nfc_perror (r.pdi, "nfc_initiator_select_passive_target");
 		ERR ("Tag has been removed");
@@ -850,7 +854,7 @@ countKeys * uniqsort(uint64_t * possibleKeys, uint32_t size) {
 
 	qsort(possibleKeys, size, sizeof (uint64_t), compar_int);
 
-	our_counts = calloc(size, sizeof(countKeys));
+	our_counts = (countKeys*)calloc(size, sizeof(countKeys));
 	if (our_counts == NULL) {
 		ERR ("Memory allocation error for our_counts");
 		exit (EXIT_FAILURE);
