@@ -25,7 +25,11 @@ class pde(Task.Task):
 		pde = open(self.inputs[0].abspath(), "r");
 		cpp = open(self.outputs[0].abspath(), 'w')
 		
+		cpp.write('#if defined(ARDUINO) && ARDUINO >= 100\n')
 		cpp.write('#include "Arduino.h"\n')
+		cpp.write('#else\n')
+		cpp.write('#include "WProgram.h"\n')
+		cpp.write('#endif\n')
 		cpp.write('void setup();')
 		cpp.write('void loop();')
 
@@ -71,10 +75,11 @@ class hex(Task.Task):
 		
 		out = self.generator.bld.cmd_and_log(lst, cwd=wd, env=env.env or None, output=0, quiet=0)[0]
 		size = int(out.splitlines()[1].split('\t')[1].strip())
-		if(size <= 32256):
-			Logs.pprint('BLUE', 'Binary sketch size: %d bytes (of a 32256 byte maximum)' % size)
+		maxsize = env.ARDUINO['upload.maximum_size']
+		if(size <= maxsize):
+			Logs.pprint('BLUE', 'Binary sketch size: %d bytes (of a %s byte maximum)' % (size, maxsize))
 		else:
-			Logs.pprint('RED', 'Binary sketch size: %d bytes (of a 32256 byte maximum)' % size)
+			Logs.pprint('RED', 'Binary sketch size: %d bytes (of a %s byte maximum)' % (size, maxsize))
 
 @feature('cxxprogram', 'cprogram') 
 @after('apply_link') 
@@ -90,14 +95,34 @@ def makeUploadArduinoProgram(self):
 		cmd = [self.env.AVRDUDE]
 		cmd += ['-C%s' % self.env.AVRDUDECONF]
 		cmd += ['-v']
-		cmd += ['-p%s' % conf.env.MCU]
+		cmd += ['-p%s' % conf.env.ARDUINO['build.mcu']]
 		cmd += ['-carduino']
 		cmd += ['-P/dev/ttyACM0']
-		cmd += ['-b115200']
+		cmd += ['-b%s' % conf.env.ARDUINO['upload.speed']]
 		cmd += ['-D']
 		cmd += ['-Uflash:w:%s:i' % hexnode.abspath()]
 		subprocess.call(cmd)
 
+
+def getAvailableBoards(ctx):
+	boardsfile = os.path.abspath(ctx.env.ARDUINO_PATH + '/hardware/arduino/boards.txt')
+	try:
+		brd = open(boardsfile, "r");
+		boards = {}
+		for l in brd:
+			l = l.strip()
+			if len(l) == 0 or l.startswith('#'):
+				continue
+			property = l.split('=')
+			value = property[1]
+			property = property[0].split('.', 1)
+			board = property[0]
+			if not board in boards:
+				boards[board] = {}
+			boards[board][property[1]] = value
+		return boards
+	except Exception, e:
+		print e;
 
 def options(opt):
 	opt.load('compiler_c')
@@ -105,25 +130,40 @@ def options(opt):
 	opt.add_option('--upload', action='store_true', default=False, help='Upload on target', dest='upload')
 	opt.add_option('--path', action='store', default='', help='path of the arduino ide', dest='idepath')
 	opt.add_option('--arduino', action='store', default='uno', help='Arduino Board (uno, mega, ...)', dest='board')
-	
+
+def boards(ctx):
+	"""display available arduino boards """
+	arduinos = getAvailableBoards(ctx)
+	Logs.pprint('BLUE', "Arduino boards available :")
+	for b in arduinos:
+		Logs.pprint('NORMAL', "%s : %s" % (b.ljust(max(15, len(b))), arduinos[b]['name']))
+
 
 def configure(conf):
+	arduinoIdeVersion = '101' #todo get arduino ide version automatically
+	
 	searchpath = []
 	relBinPath = ['hardware/tools/', 'hardware/tools/avr/bin/']
 	relIncPath = ['hardware/arduino/cores/arduino/', 'hardware/arduino/variants/standard/']
+	
 	if os.path.exists(Options.options.idepath):
-		for p in relBinPath:
-			path = os.path.abspath(Options.options.idepath + '/' + p)
-			if os.path.exists(path):
-				searchpath += [path]
-			avrdudeconf = os.path.abspath(path + '/avrdude.conf')
-			if os.path.exists(avrdudeconf):
-				conf.env.AVRDUDECONF = avrdudeconf
+		conf.env.ARDUINO_PATH = Options.options.idepath
+	else:
+		conf.env.ARDUINO_PATH = '/usr/share/arduino'
 		
-		for p in relIncPath:
-			path = os.path.abspath(Options.options.idepath + '/' + p)
-			if os.path.exists(path):
-				conf.env.INCLUDES += [path]
+	for p in relBinPath:
+		path = os.path.abspath(conf.env.ARDUINO_PATH + '/' + p)
+		if os.path.exists(path):
+			searchpath += [path]
+		avrdudeconf = os.path.abspath(path + '/avrdude.conf')
+		if os.path.exists(avrdudeconf):
+			conf.env.AVRDUDECONF = avrdudeconf
+	
+	for p in relIncPath:
+		path = os.path.abspath(Options.options.idepath + '/' + p)
+		if os.path.exists(path):
+			conf.env.INCLUDES += [path]
+
 	
 	searchpath += os.environ['PATH'].split(os.pathsep)
 	searchpath = filter(None, searchpath)
@@ -144,23 +184,24 @@ def configure(conf):
 	conf.load('compiler_cxx')
 
 	# arduino board ...
-	conf.env.F_CPU = '16000000L'
-	if Options.options.board.lower() == "uno":
-		conf.env.MCU = 'atmega328p'
-		conf.msg('Arduino ', 'Uno')
-	elif Options.options.board.lower() == "mega":
-		conf.env.MCU = 'atmega1280'
-		conf.msg('Arduino ', 'Mega')
-	elif Options.options.board.lower() == "mega2650":
-		conf.env.MCU = 'atmega2650'
-		conf.msg('Arduino ', 'Mega 2650')
+	boardsfile = os.path.abspath(conf.env.ARDUINO_PATH + '/hardware/arduino/boards.txt')
+	if os.path.exists(boardsfile):
+		arduinos = getAvailableBoards(conf)
+	else:
+		conf.fatal('Can\'t find boards description file : %s' % boardsfile)
 	
+	if not Options.options.board in arduinos:
+		conf.fatal('Arduino ', 'Unknown board %s!' % Options.options.board)
+	arduino = arduinos[Options.options.board]
+	conf.env.ARDUINO = arduino
 	
-	flags = ['-g', '-Os' , '-w' , '-Wall', '-std=c99', '-fno-exceptions', '-ffunction-sections' , '-fdata-sections', '-mmcu=%s' % conf.env.MCU, '-MMD']
+	conf.msg('Arduino ', '%s' % arduino['name'], 'BLUE')
+		
+	flags = ['-g', '-Os' , '-w' , '-Wall', '-std=c99', '-fno-exceptions', '-ffunction-sections' , '-fdata-sections', '-mmcu=%s' % conf.env.ARDUINO['build.mcu'], '-MMD']
 	conf.env.CFLAGS = flags
 	conf.env.CXXFLAGS = flags
-	conf.env.DEFINES = ['F_CPU=%s' % conf.env.F_CPU, 'USB_VID=null', 'USB_PID=null', 'ARDUINO=101'] #todo get the version of the arduino ide
-	conf.env.LINKFLAGS = ['-Wl,--gc-sections', '-mmcu=%s' % conf.env.MCU]
+	conf.env.DEFINES = ['F_CPU=%s' % conf.env.ARDUINO['build.f_cpu'], 'USB_VID=null', 'USB_PID=null', 'ARDUINO=%s' % arduinoIdeVersion]
+	conf.env.LINKFLAGS = ['-Wl,--gc-sections', '-mmcu=%s' % conf.env.ARDUINO['build.mcu']]
 	
 	conf.env.INCLUDES += ['libraries']
 	conf.env.ARDUINO_SRC_CORE = glob.glob('%s/hardware/arduino/cores/arduino/*.c' % Options.options.idepath)
@@ -194,5 +235,9 @@ def openSerial(ctx):
 		ser.close()
 	except Exception, e:
 		Logs.pprint('RED', e)
-	  
 
+
+from waflib.Build import BuildContext
+class boardslist(BuildContext):
+	cmd = 'boards'
+	fun = 'boards'
