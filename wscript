@@ -30,8 +30,8 @@ class pde(Task.Task):
 		cpp.write('#else\n')
 		cpp.write('#include "WProgram.h"\n')
 		cpp.write('#endif\n')
-		cpp.write('void setup();')
-		cpp.write('void loop();')
+		cpp.write('void setup();\n')
+		cpp.write('void loop();\n')
 
 		for l in pde:
 			cpp.write(l)

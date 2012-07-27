@@ -1,4 +1,4 @@
-#include <PN532.h>
+#include <PN532/PN532.h>
 
 #include "mfoc.h"
 

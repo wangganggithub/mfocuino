@@ -1,3 +1,11 @@
+#ifndef __MFOC_H__
+#define __MFOC_H__
+
+#include <nfc/nfc-types.h>
+
+#define EXIT_SUCCESS	 0
+#define EXIT_FAILURE	-1
+
 #define MEM_CHUNK               10000
 #define TRY_KEYS                50
 
@@ -85,3 +93,5 @@ int compar_special_int(const void * a, const void * b);
 countKeys * uniqsort(uint64_t *possibleKeys, uint32_t size);
 void num_to_bytes(uint64_t n, uint32_t len, uint8_t* dest);
 long long unsigned int bytes_to_num(uint8_t* src, uint32_t len);
+
+#endif // __MFOC_H__
