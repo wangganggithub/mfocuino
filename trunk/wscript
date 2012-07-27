@@ -228,7 +228,7 @@ def build(bld):
 	bld(features = 'c cxx cxxprogram',
 		includes = 'src',
 		source = src, 
-		target = 'test.elf',
+		target = 'mfocuino.elf',
 		lib = 'm',
 		use = 'core',
 	)
