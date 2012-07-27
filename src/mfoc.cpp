@@ -42,11 +42,13 @@
 
 // NFC
 #include <nfc/nfc.h>
+#include "nfc-utils.h"
 
 // Crapto1
 #include "crapto1.h"
 
 // Internal
+#include "errors.h"
 #include "mifare.h"
 #include "nfc-utils.h"
 #include "mfoc.h"
@@ -117,26 +119,26 @@ int mfocmain(uint32_t id) {
 	mf_init(&r);
 
 	if (nfc_initiator_init (r.pdi) < 0) {
-		nfc_perror (r.pdi, "nfc_initiator_init");
+		nfc_perror (r.pdi, ERROR_NFC_INITIATOR_INIT);
 		goto error;
 	}
 	// Drop the field for a while, so can be reset
 	if (nfc_device_set_property_bool(r.pdi, NP_ACTIVATE_FIELD, true) < 0) {
-		nfc_perror (r.pdi, "nfc_device_set_property_bool activate field");
+		nfc_perror (r.pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_ACTIVATE_FIELD);
 		goto error;
 	}
 	// Let the reader only try once to find a tag
 	if (nfc_device_set_property_bool(r.pdi, NP_INFINITE_SELECT, false) < 0) {
-		nfc_perror (r.pdi, "nfc_device_set_property_bool infinite select");
+		nfc_perror (r.pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_INFINITE_SELECT);
 		goto error;
 	}
 	// Configure the CRC and Parity settings
 	if (nfc_device_set_property_bool(r.pdi, NP_HANDLE_CRC, true) < 0) {
-		nfc_perror (r.pdi, "nfc_device_set_property_bool crc");
+		nfc_perror (r.pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_CRC);
 		goto error;
 	}
 	if (nfc_device_set_property_bool(r.pdi, NP_HANDLE_PARITY, true) < 0) {
-		nfc_perror (r.pdi, "nfc_device_set_property_bool parity");
+		nfc_perror (r.pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_PARITY);
 		goto error;
 	}
 
@@ -147,7 +149,7 @@ int mfocmain(uint32_t id) {
 
 	// mf_select_tag(r.pdi, &(t.nt));
 	if (nfc_initiator_select_passive_target (r.pdi, nm, NULL, 0, &t.nt) < 0) {
-		nfc_perror (r.pdi, "nfc_initiator_select_passive_target");
+		nfc_perror (r.pdi, ERROR_NFC_INITIATOR_SELECT_PASSIVE_TARGET);
 		goto error;
 	}
 
@@ -477,31 +479,31 @@ void mf_init(mfreader *r) {
 
 void mf_configure(nfc_device* pdi) {
 	if (nfc_initiator_init (pdi) < 0) {
-		nfc_perror (pdi, "nfc_initiator_init");
+		nfc_perror (pdi, ERROR_NFC_INITIATOR_INIT);
 		exit (EXIT_FAILURE);
 	}
 	// Drop the field for a while, so can be reset
 	if (nfc_device_set_property_bool(pdi, NP_ACTIVATE_FIELD, false) < 0) {
-		nfc_perror (pdi, "nfc_device_set_property_bool activate field");
+		nfc_perror (pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_ACTIVATE_FIELD);
 		exit (EXIT_FAILURE);
 	}
 	// Let the reader only try once to find a tag
 	if (nfc_device_set_property_bool(pdi, NP_INFINITE_SELECT, false) < 0) {
-		nfc_perror (pdi, "nfc_device_set_property_bool infinite select");
+		nfc_perror (pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_INFINITE_SELECT);
 		exit (EXIT_FAILURE);
 	}
 	// Configure the CRC and Parity settings
 	if (nfc_device_set_property_bool(pdi, NP_HANDLE_CRC, true) < 0) {
-		nfc_perror (pdi, "nfc_device_set_property_bool crc");
+		nfc_perror (pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_CRC);
 		exit (EXIT_FAILURE);
 	}
 	if (nfc_device_set_property_bool(pdi, NP_HANDLE_PARITY, true) < 0) {
-		nfc_perror (pdi, "nfc_device_set_property_bool parity");
+		nfc_perror (pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_PARITY);
 		exit (EXIT_FAILURE);
 	}
 	// Enable the field so more power consuming cards can power themselves up
 	if (nfc_device_set_property_bool(pdi, NP_ACTIVATE_FIELD, true) < 0) {
-		nfc_perror (pdi, "nfc_device_set_property_bool activate field");
+		nfc_perror (pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_ACTIVATE_FIELD);
 		exit (EXIT_FAILURE);
 	}
 }
@@ -561,7 +563,7 @@ void mf_anticollision(mftag t, mfreader r) {
 	const nfc_modulation nm = { /*.nmt = */ NMT_ISO14443A, /*.nbr = */ NBR_106 };
 	
 	if (nfc_initiator_select_passive_target(r.pdi, nm, NULL, 0, &t.nt) < 0) {
-		nfc_perror (r.pdi, "nfc_initiator_select_passive_target");
+		nfc_perror (r.pdi, ERROR_NFC_INITIATOR_SELECT_PASSIVE_TARGET);
 		ERR ("Tag has been removed");
 		exit (EXIT_FAILURE);
 	}
@@ -601,14 +603,14 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 
 	// We need full control over the CRC
 	if (nfc_device_set_property_bool(r.pdi, NP_HANDLE_CRC, false) < 0)  {
-		nfc_perror (r.pdi, "nfc_device_set_property_bool crc");
+		nfc_perror (r.pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_CRC);
 		exit (EXIT_FAILURE);
 	}
 
 	// Request plain tag-nonce
 	// TODO: Set NP_EASY_FRAMING option only once if possible
 	if (nfc_device_set_property_bool (r.pdi, NP_EASY_FRAMING, false) < 0) {
-		nfc_perror (r.pdi, "nfc_device_set_property_bool framing");
+		nfc_perror (r.pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_FRAMING);
 		exit (EXIT_FAILURE);
 	}
 
@@ -618,7 +620,7 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 	}
 
 	if (nfc_device_set_property_bool (r.pdi, NP_EASY_FRAMING, true) < 0) {
-		nfc_perror (r.pdi, "nfc_device_set_property_bool");
+		nfc_perror (r.pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_FRAMING);
 		exit (EXIT_FAILURE);
 	}
 	// print_hex(Rx, 4);
@@ -655,7 +657,7 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 
 	// Finally we want to send arbitrary parity bits
 	if (nfc_device_set_property_bool(r.pdi, NP_HANDLE_PARITY, false) < 0) {
-		nfc_perror (r.pdi, "nfc_device_set_property_bool parity");
+		nfc_perror (r.pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_PARITY);
 		exit (EXIT_FAILURE);
 	}
 
@@ -757,12 +759,12 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 
 		// Finally we want to send arbitrary parity bits
 		if (nfc_device_set_property_bool(r.pdi, NP_HANDLE_PARITY, true) < 0)  {
-			nfc_perror (r.pdi, "nfc_device_set_property_bool parity restore M");
+			nfc_perror (r.pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_PARITY_RESTORE_M);
 			exit (EXIT_FAILURE);
 		}
 
 		if (nfc_device_set_property_bool(r.pdi, NP_HANDLE_CRC, true) < 0)  {
-			nfc_perror (r.pdi, "nfc_device_set_property_bool crc restore M");
+			nfc_perror (r.pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_CRC_RESTORE_M);
 			exit (EXIT_FAILURE);
 		}
 
