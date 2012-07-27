@@ -33,10 +33,6 @@
 
 #include "nfc-utils.h"
 
-uint8_t oddparity(const uint8_t bt) {
-	return ((~bt) & 0x1);
-}
-
 void
 print_hex (const uint8_t *pbtData, const size_t szBytes) {
 	size_t  szPos;

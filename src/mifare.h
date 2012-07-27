@@ -34,12 +34,17 @@
  */
 
 #ifndef _LIBNFC_MIFARE_H_
-#  define _LIBNFC_MIFARE_H_
+#define _LIBNFC_MIFARE_H_
 
-#  include <nfc/nfc-types.h>
+
+#ifdef __cplusplus
+extern  "C" {
+#endif
+
+#include <nfc/nfc-types.h>
 
 // Compiler directive, set struct alignment to 1 uint8_t for compatibility
-#  pragma pack(1)
+#pragma pack(1)
 
 typedef enum {
   MC_AUTH_A = 0x60,
@@ -73,12 +78,12 @@ typedef union {
 } mifare_param;
 
 // Reset struct alignment to default
-#  pragma pack()
+#pragma pack()
 
 bool    nfc_initiator_mifare_cmd(nfc_device *pnd, const mifare_cmd mc, const uint8_t ui8Block, mifare_param *pmp);
 
 // Compiler directive, set struct alignment to 1 uint8_t for compatibility
-#  pragma pack(1)
+#pragma pack(1)
 
 // MIFARE Classic
 typedef struct {
@@ -134,6 +139,11 @@ typedef struct {
 } mifareul_tag;
 
 // Reset struct alignment to default
-#  pragma pack()
+#pragma pack()
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _LIBNFC_MIFARE_H_

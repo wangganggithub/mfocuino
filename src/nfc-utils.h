@@ -36,6 +36,11 @@
 #ifndef _EXAMPLES_NFC_UTILS_H_
 #define _EXAMPLES_NFC_UTILS_H_
 
+
+#ifdef __cplusplus
+extern  "C" {
+#endif
+
 #include <stdlib.h>
 #include <string.h>
 #include <err.h>
@@ -58,8 +63,9 @@
  */
 #define ERR(...)
 
-
-uint8_t  oddparity (const uint8_t bt);
+inline uint8_t oddparity(const uint8_t bt) {
+	return ((~bt) & 0x1);
+}
 
 void    print_hex (const uint8_t *pbtData, const size_t szLen);
 
@@ -74,5 +80,9 @@ void    print_nfc_dep_info (const nfc_dep_info ndi, bool verbose);
 const char * str_nfc_baud_rate (const nfc_baud_rate nbr);
 
 void    print_nfc_target (const nfc_target nt, bool verbose);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
