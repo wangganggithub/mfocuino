@@ -75,7 +75,7 @@ class hex(Task.Task):
 		
 		out = self.generator.bld.cmd_and_log(lst, cwd=wd, env=env.env or None, output=0, quiet=0)[0]
 		size = int(out.splitlines()[1].split('\t')[1].strip())
-		maxsize = env.ARDUINO['upload.maximum_size']
+		maxsize = int(env.ARDUINO['upload.maximum_size'])
 		if(size <= maxsize):
 			Logs.pprint('BLUE', 'Binary sketch size: %d bytes (of a %s byte maximum)' % (size, maxsize))
 		else:
