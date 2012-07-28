@@ -406,7 +406,7 @@ int mfocmain(uint32_t id) {
 			} else { // and Read
 				if (nfc_initiator_mifare_cmd(r.pdi, MC_READ, block, &mp)) {
 					fprintf(stdout, "Block %02d, type %c, key %012llx :", block, 'A', bytes_to_num(t.sectors[i].KeyA, 6));
-					print_hex(mp.mpd.abtData, 16);
+					printHex(mp.mpd.abtData, 16);
 					mf_configure(r.pdi);
 					mf_select_tag(r.pdi, &(t.nt));
 					failure = false;
@@ -423,7 +423,7 @@ int mfocmain(uint32_t id) {
 					} else { // and Read
 						if (nfc_initiator_mifare_cmd(r.pdi, MC_READ, block, &mp)) {
 							fprintf(stdout, "Block %02d, type %c, key %012llx :", block, 'B', bytes_to_num(t.sectors[i].KeyB, 6));
-							print_hex(mp.mpd.abtData, 16);
+							printHex(mp.mpd.abtData, 16);
 							mf_configure(r.pdi);
 							mf_select_tag(r.pdi, &(t.nt));
 							failure = false;
@@ -599,7 +599,7 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 	Auth[0] = (t.sectors[e_sector].foundKeyA) ? 0x60 : 0x61;
 	iso14443a_crc_append (Auth,2);
 	// fprintf(stdout, "\nAuth command:\t");
-	// print_hex(Auth, 4);
+	// printHex(Auth, 4);
 
 	// We need full control over the CRC
 	if (nfc_device_set_property_bool(r.pdi, NP_HANDLE_CRC, false) < 0)  {
@@ -623,7 +623,7 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 		nfc_perror (r.pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_FRAMING);
 		exit (EXIT_FAILURE);
 	}
-	// print_hex(Rx, 4);
+	// printHex(Rx, 4);
 
 	// Save the tag nonce (Nt)
 	Nt = bytes_to_num(Rx, 4);
@@ -663,7 +663,7 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 
 	// Transmit reader-answer
 	// fprintf(stdout, "\t{Ar}:\t");
-	// print_hex_par(ArEnc, 64, ArEncPar);
+	// printHex_par(ArEnc, 64, ArEncPar);
 	int res;
 	if (((res = nfc_initiator_transceive_bits(r.pdi, ArEnc, 64, ArEncPar, Rx, RxPar)) < 0) || (res != 32)) {
 		ERR ("Reader-answer transfer error, exiting..");
@@ -672,7 +672,7 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 
 	// Now print the answer from the tag
 	// fprintf(stdout, "\t{At}:\t");
-	// print_hex_par(Rx,RxLen,RxPar);
+	// printHex_par(Rx,RxLen,RxPar);
 
 	// Decrypt the tag answer and verify that suc3(Nt) is At
 	Nt = prng_successor(Nt, 32);

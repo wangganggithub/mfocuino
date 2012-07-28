@@ -67,7 +67,8 @@ inline uint8_t oddparity(const uint8_t bt) {
 	return ((~bt) & 0x1);
 }
 
-void    print_hex (const uint8_t *pbtData, const size_t szLen);
+void printHex(const uint8_t * data, const uint32_t numBytes);
+void printHexChar(const uint8_t * data, const uint32_t numBytes);
 
 void    print_nfc_iso14443a_info (const nfc_iso14443a_info nai, bool verbose);
 void    print_nfc_iso14443b_info (const nfc_iso14443b_info nbi, bool verbose);

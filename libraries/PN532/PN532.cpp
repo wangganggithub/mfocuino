@@ -4,7 +4,11 @@
 // authenticateBlock, readMemoryBlock, writeMemoryBlock contributed
 // by Seeed Technology Inc (www.seeedstudio.com)
 
-#include <WProgram.h>
+#if ARDUINO >= 100
+ #include "Arduino.h"
+#else
+ #include "WProgram.h"
+#endif
 #include "PN532.h"
 
 //#define PN532DEBUG 1
