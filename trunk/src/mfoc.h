@@ -79,7 +79,7 @@ typedef struct {
 
 int mfocmain(uint32_t id);
 
-void mf_init(mfreader *r);
+int mf_init(mfreader *r);
 void mf_configure(nfc_device* pdi);
 void mf_select_tag(nfc_device* pdi, nfc_target* pnt);
 int trailer_block(uint32_t block);
