@@ -95,10 +95,10 @@ def makeUploadArduinoProgram(self):
 		cmd = [self.env.AVRDUDE]
 		cmd += ['-C%s' % self.env.AVRDUDECONF]
 		cmd += ['-v']
-		cmd += ['-p%s' % conf.env.ARDUINO['build.mcu']]
+		cmd += ['-p%s' % self.env.ARDUINO['build.mcu']]
 		cmd += ['-carduino']
 		cmd += ['-P/dev/ttyACM0']
-		cmd += ['-b%s' % conf.env.ARDUINO['upload.speed']]
+		cmd += ['-b%s' % self.env.ARDUINO['upload.speed']]
 		cmd += ['-D']
 		cmd += ['-Uflash:w:%s:i' % hexnode.abspath()]
 		subprocess.call(cmd)
