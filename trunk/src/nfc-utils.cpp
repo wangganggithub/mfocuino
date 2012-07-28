@@ -28,19 +28,70 @@
  *
  */
 
+#if defined(ARDUINO) && ARDUINO >= 100
+#include "Arduino.h"
+#else
+#include "WProgram.h"
+#endif
+
 #include <nfc/nfc.h>
 #include <err.h>
 
 #include "nfc-utils.h"
 
-void
-print_hex (const uint8_t *pbtData, const size_t szBytes) {
-	size_t  szPos;
+/**************************************************************************/
+/*!
+    @brief  Prints a hexadecimal value in plain characters
 
-	for (szPos = 0; szPos < szBytes; szPos++) {
-		printf ("%02x  ", pbtData[szPos]);
+    @param  data      Pointer to the byte data
+    @param  numBytes  Data length in bytes
+*/
+/**************************************************************************/
+void printHex(const uint8_t * data, const uint32_t numBytes) {
+	uint32_t szPos;
+	for (szPos=0; szPos < numBytes; szPos++) {
+		Serial.print("0x");
+		// Append leading 0 for small values
+		if (data[szPos] <= 0xF)
+			Serial.print("0");
+		Serial.print(data[szPos], HEX);
+		if ((numBytes > 1) && (szPos != numBytes - 1)) {
+			Serial.print(" ");
+		}
 	}
-	printf ("\n");
+	Serial.println("");
+}
+
+/**************************************************************************/
+/*!
+    @brief  Prints a hexadecimal value in plain characters, along with
+            the char equivalents in the following format
+
+            00 00 00 00 00 00  ......
+
+    @param  data      Pointer to the byte data
+    @param  numBytes  Data length in bytes
+*/
+/**************************************************************************/
+void printHexChar(const uint8_t * data, const uint32_t numBytes) {
+	uint32_t szPos;
+	for (szPos=0; szPos < numBytes; szPos++) {
+		// Append leading 0 for small values
+		if (data[szPos] <= 0xF)
+			Serial.print("0");
+		Serial.print(data[szPos], HEX);
+		if ((numBytes > 1) && (szPos != numBytes - 1)) {
+			Serial.print(" ");
+		}
+	}
+	Serial.print("  ");
+	for (szPos=0; szPos < numBytes; szPos++) {
+		if (data[szPos] <= 0x1F)
+			Serial.print(".");
+		else
+			Serial.print(data[szPos]);
+	}
+	Serial.println("");
 }
 
 #define SAK_UID_NOT_COMPLETE     0x04
@@ -50,7 +101,7 @@ print_hex (const uint8_t *pbtData, const size_t szBytes) {
 void
 print_nfc_iso14443a_info (const nfc_iso14443a_info nai, bool verbose) {
 	printf ("    ATQA (SENS_RES): ");
-	print_hex (nai.abtAtqa, 2);
+	printHex (nai.abtAtqa, 2);
 	if (verbose) {
 		printf("* UID size: ");
 		switch ((nai.abtAtqa[1] & 0xc0)>>6) {
@@ -82,14 +133,14 @@ print_nfc_iso14443a_info (const nfc_iso14443a_info nai, bool verbose) {
 		}
 	}
 	printf ("       UID (NFCID%c): ", (nai.abtUid[0] == 0x08 ? '3' : '1'));
-	print_hex (nai.abtUid, nai.szUidLen);
+	printHex (nai.abtUid, nai.szUidLen);
 	if (verbose) {
 		if (nai.abtUid[0] == 0x08) {
 			printf ("* Random UID\n");
 		}
 	}
 	printf ("      SAK (SEL_RES): ");
-	print_hex (&nai.btSak, 1);
+	printHex (&nai.btSak, 1);
 	if (verbose) {
 		if (nai.btSak & SAK_UID_NOT_COMPLETE) {
 			printf ("* Warning! Cascade bit set: UID not complete\n");
@@ -107,7 +158,7 @@ print_nfc_iso14443a_info (const nfc_iso14443a_info nai, bool verbose) {
 	}
 	if (nai.szAtsLen) {
 		printf ("                ATS: ");
-		print_hex (nai.abtAts, nai.szAtsLen);
+		printHex (nai.abtAts, nai.szAtsLen);
 	}
 	if (nai.szAtsLen && verbose) {
 		// Decode ATS according to ISO/IEC 14443-4 (5.2 Answer to select)
@@ -173,7 +224,7 @@ print_nfc_iso14443a_info (const nfc_iso14443a_info nai, bool verbose) {
 		}
 		if (nai.szAtsLen > offset) {
 			printf ("* Historical bytes Tk: " );
-			print_hex (nai.abtAts + offset, (nai.szAtsLen - offset));
+			printHex (nai.abtAts + offset, (nai.szAtsLen - offset));
 			uint8_t CIB = nai.abtAts[offset];
 			offset++;
 			if (CIB != 0x00 && CIB != 0x10 && (CIB & 0xf0) != 0x80) {
@@ -447,20 +498,20 @@ void
 print_nfc_felica_info (const nfc_felica_info nfi, bool verbose) {
 	(void) verbose;
 	printf ("        ID (NFCID2): ");
-	print_hex (nfi.abtId, 8);
+	printHex (nfi.abtId, 8);
 	printf ("    Parameter (PAD): ");
-	print_hex (nfi.abtPad, 8);
+	printHex (nfi.abtPad, 8);
 	printf ("   System Code (SC): ");
-	print_hex (nfi.abtSysCode, 2);
+	printHex (nfi.abtSysCode, 2);
 }
 
 void
 print_nfc_jewel_info (const nfc_jewel_info nji, bool verbose) {
 	(void) verbose;
 	printf ("    ATQA (SENS_RES): ");
-	print_hex (nji.btSensRes, 2);
+	printHex (nji.btSensRes, 2);
 	printf ("      4-LSB JEWELID: ");
-	print_hex (nji.btId, 4);
+	printHex (nji.btId, 4);
 }
 
 #define PI_ISO14443_4_SUPPORTED 0x01
@@ -470,11 +521,11 @@ void
 print_nfc_iso14443b_info (const nfc_iso14443b_info nbi, bool verbose) {
 	const int iMaxFrameSizes[] = { 16, 24, 32, 40, 48, 64, 96, 128, 256 };
 	printf ("               PUPI: ");
-	print_hex (nbi.abtPupi, 4);
+	printHex (nbi.abtPupi, 4);
 	printf ("   Application Data: ");
-	print_hex (nbi.abtApplicationData, 4);
+	printHex (nbi.abtApplicationData, 4);
 	printf ("      Protocol Info: ");
-	print_hex (nbi.abtProtocolInfo, 3);
+	printHex (nbi.abtProtocolInfo, 3);
 	if (verbose) {
 		printf ("* Bit Rate Capability:\n");
 		if (nbi.abtProtocolInfo[0] == 0) {
@@ -523,7 +574,7 @@ print_nfc_iso14443b_info (const nfc_iso14443b_info nbi, bool verbose) {
 void
 print_nfc_iso14443bi_info (const nfc_iso14443bi_info nii, bool verbose) {
 	printf ("                DIV: ");
-	print_hex (nii.abtDIV, 4);
+	printHex (nii.abtDIV, 4);
 	if (verbose) {
 		int version = (nii.btVerLog & 0x1e)>>1;
 		printf ("   Software Version: ");
@@ -539,7 +590,7 @@ print_nfc_iso14443bi_info (const nfc_iso14443bi_info nii, bool verbose) {
 	}
 	if ((nii.btVerLog & 0x80) && (nii.btConfig & 0x40)) {
 		printf ("                ATS: ");
-		print_hex (nii.abtAtr, nii.szAtrLen);
+		printHex (nii.abtAtr, nii.szAtrLen);
 	}
 }
 
@@ -547,7 +598,7 @@ void
 print_nfc_iso14443b2sr_info (const nfc_iso14443b2sr_info nsi, bool verbose) {
 	(void) verbose;
 	printf ("                UID: ");
-	print_hex (nsi.abtUID, 8);
+	printHex (nsi.abtUID, 8);
 }
 
 void
@@ -556,7 +607,7 @@ print_nfc_iso14443b2ct_info (const nfc_iso14443b2ct_info nci, bool verbose) {
 	uint32_t uid;
 	uid = (nci.abtUID[3] << 24) + (nci.abtUID[2] << 16) + (nci.abtUID[1] << 8) + nci.abtUID[0];
 	printf ("                UID: ");
-	print_hex (nci.abtUID, sizeof(nci.abtUID));
+	printHex (nci.abtUID, sizeof(nci.abtUID));
 	printf ("      UID (decimal): %010u\n", uid);
 	printf ("       Product Code: %02X\n", nci.btProdCode);
 	printf ("           Fab Code: %02X\n", nci.btFabCode);
@@ -566,14 +617,14 @@ void
 print_nfc_dep_info (const nfc_dep_info ndi, bool verbose) {
 	(void) verbose;
 	printf ("       NFCID3: ");
-	print_hex (ndi.abtNFCID3, 10);
+	printHex (ndi.abtNFCID3, 10);
 	printf ("           BS: %02x\n", ndi.btBS);
 	printf ("           BR: %02x\n", ndi.btBR);
 	printf ("           TO: %02x\n", ndi.btTO);
 	printf ("           PP: %02x\n", ndi.btPP);
 	if (ndi.szGB) {
 		printf ("General Bytes: ");
-		print_hex (ndi.abtGB, ndi.szGB);
+		printHex (ndi.abtGB, ndi.szGB);
 	}
 }
 
