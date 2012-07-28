@@ -32,13 +32,12 @@
 
 /* vim: set ts=2 sw=2 et: */
 
-#define _XOPEN_SOURCE 1 // To enable getopt
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include <unistd.h>
+#if defined(ARDUINO) && ARDUINO >= 100
+#include "Arduino.h"
+#else
+#include "WProgram.h"
+#endif
 
 // NFC
 #include <nfc/nfc.h>
@@ -53,7 +52,11 @@
 #include "nfc-utils.h"
 #include "mfoc.h"
 
-#include <HardwareSerial.h>
+void swreset(){
+	Serial.println("RESET");
+	Serial.flush();
+	asm volatile ("jmp 0");
+}
 
 int mfocmain(uint32_t id) {
 	/*const nfc_modulation nm = {
@@ -62,8 +65,8 @@ int mfocmain(uint32_t id) {
 	};*/
 	const nfc_modulation nm = { /*.nmt = */ NMT_ISO14443A, /*.nbr = */ NBR_106 };
 	
-	int ch, i, k, n, j, m;
-	int key, block;
+	int ch, k, n, j, m;
+	int block;
 	int succeed = 1;
 
 	// Exploit sector
@@ -116,30 +119,33 @@ int mfocmain(uint32_t id) {
 	mifare_cmd mc;
 
 	// Initialize reader/tag structures
-	mf_init(&r);
+	if(mf_init(&r) < 0){
+		nfc_perror (r.pdi, ERROR_NO_NFC_DEVICE_FOUND);
+		return -1;
+	}
 
 	if (nfc_initiator_init (r.pdi) < 0) {
 		nfc_perror (r.pdi, ERROR_NFC_INITIATOR_INIT);
-		goto error;
+		return -1;
 	}
 	// Drop the field for a while, so can be reset
 	if (nfc_device_set_property_bool(r.pdi, NP_ACTIVATE_FIELD, true) < 0) {
 		nfc_perror (r.pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_ACTIVATE_FIELD);
-		goto error;
+		return -1;
 	}
 	// Let the reader only try once to find a tag
 	if (nfc_device_set_property_bool(r.pdi, NP_INFINITE_SELECT, false) < 0) {
 		nfc_perror (r.pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_INFINITE_SELECT);
-		goto error;
+		return -1;
 	}
 	// Configure the CRC and Parity settings
 	if (nfc_device_set_property_bool(r.pdi, NP_HANDLE_CRC, true) < 0) {
 		nfc_perror (r.pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_CRC);
-		goto error;
+		return -1;
 	}
 	if (nfc_device_set_property_bool(r.pdi, NP_HANDLE_PARITY, true) < 0) {
 		nfc_perror (r.pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_PARITY);
-		goto error;
+		return -1;
 	}
 
 /*
@@ -150,13 +156,13 @@ int mfocmain(uint32_t id) {
 	// mf_select_tag(r.pdi, &(t.nt));
 	if (nfc_initiator_select_passive_target (r.pdi, nm, NULL, 0, &t.nt) < 0) {
 		nfc_perror (r.pdi, ERROR_NFC_INITIATOR_SELECT_PASSIVE_TARGET);
-		goto error;
+		return -1;
 	}
 
 	// Test if a compatible MIFARE tag is used
 	if ((t.nt.nti.nai.btSak & 0x08) == 0) {
-		ERR ("only Mifare Classic is supported");
-		goto error;
+		nfc_perror (r.pdi, ERROR_NFC_ONLY_MIFARE_CLASSIC_IS_SUPPORTED);
+		return -1;
 	}
 
 	// Save tag's block size (b4K)
@@ -168,16 +174,16 @@ int mfocmain(uint32_t id) {
 
 	t.sectors = (sector*) calloc(t.num_sectors, sizeof(sector));
 	if (t.sectors == NULL) {
-		ERR ("Cannot allocate memory for t.sectors");
-		goto error;
+		nfc_perror (r.pdi, ERROR_MEMORY_ALLOCATION);
+		return -1;
 	}
 	if ((pk = (pKeys*) malloc(sizeof(pKeys))) == NULL) {
-		ERR ("Cannot allocate memory for pk");
-		goto error;
+		nfc_perror (r.pdi, ERROR_MEMORY_ALLOCATION);
+		return -1;
 	}
 	if ((bk = (bKeys*) malloc(sizeof(bKeys))) == NULL) {
-		ERR ("Cannot allocate memory for bk");
-		goto error;
+		nfc_perror (r.pdi, ERROR_MEMORY_ALLOCATION);
+		return -1;
 	} else {
 		bk->brokenKeys = NULL;
 		bk->size = 0;
@@ -185,8 +191,8 @@ int mfocmain(uint32_t id) {
 
 	d.distances = (uint32_t*) calloc(d.num_distances, sizeof(uint32_t));
 	if (d.distances == NULL) {
-		ERR ("Cannot allocate memory for t.distances");
-		goto error;
+		nfc_perror (r.pdi, ERROR_MEMORY_ALLOCATION);
+		return -1;
 	}
 	
 	// Initialize t.sectors, keys are not known yet
@@ -194,14 +200,14 @@ int mfocmain(uint32_t id) {
 		t.sectors[s].foundKeyA = t.sectors[s].foundKeyB = false;
 	}
 
-	print_nfc_iso14443a_info (t.nt.nti.nai, true);
+	//print_nfc_iso14443a_info (t.nt.nti.nai, true);
 
 	// Try to authenticate to all sectors with default keys
 	// Set the authentication information (uid)
 	memcpy(mp.mpa.abtAuthUid, t.nt.nti.nai.abtUid + t.nt.nti.nai.szUidLen - 4, sizeof(mp.mpa.abtAuthUid));
 	// Iterate over all keys (n = number of keys)
 	n = sizeof(defaultKeys)/sizeof(defaultKeys[0]);
-	key = 0;
+	int key = 0;
 	
 	while (key < n) {
 		if (defKey_bytes_todo > 0) {
@@ -211,17 +217,25 @@ int mfocmain(uint32_t id) {
 			memcpy(mp.mpa.abtKey, defaultKeys[key], sizeof(mp.mpa.abtKey));
 			key++;
 		}
-		fprintf(stdout, "[Key: %012llx] -> ", bytes_to_num(mp.mpa.abtKey, 6));
-		fprintf(stdout, "[");
-		i = 0; // Sector counter
+		
+		Serial.print("[Key: ");
+		printHex(mp.mpa.abtKey, 6);
+		Serial.print("] -> [");
+
+		int i = 0; // Sector counter
 		// Iterate over every block, where we haven't found a key yet
 		for (block = 0; block <= t.num_blocks; ++block) {
 			if (trailer_block(block)) {
 				if (!t.sectors[i].foundKeyA) {
 					mc = MC_AUTH_A;
 					if (!nfc_initiator_mifare_cmd(r.pdi,mc,block,&mp)) {
-						// fprintf(stdout, "!!Error: AUTH [Key A:%012llx] sector %02x t_block %02x\n",
-						// 	bytes_to_num(mp.mpa.abtKey, 6), i, block);
+						//Serial.print("!!Error: AUTH [Key A:");
+						//printHex(mp.mpa.abtKey, 6);
+						//Serial.print("] sector ");
+						//Serial.print(i, HEX);
+						//Serial.print(" t_block ");
+						//Serial.println(block, HEX);
+
 						mf_anticollision(t, r);
 					} else {
 						// Save all information about successfull keyA authentization
@@ -232,8 +246,13 @@ int mfocmain(uint32_t id) {
 				if (!t.sectors[i].foundKeyB) {
 					mc = MC_AUTH_B;
 					if (!nfc_initiator_mifare_cmd(r.pdi,mc,block,&mp)) {
-						// fprintf(stdout, "!!Error: AUTH [Key B:%012llx] sector %02x t_block %02x\n",
-						//	bytes_to_num(mp.mpa.abtKey, 6), i, block);
+						//Serial.print("!!Error: AUTH [Key B:");
+						//printHex(mp.mpa.abtKey, 6);
+						//Serial.print("] sector ");
+						//Serial.print(i, HEX);
+						//Serial.print(" t_block ");
+						//Serial.println(block, HEX);
+
 						mf_anticollision(t, r);
 						// No success, try next block
 						t.sectors[i].trailer = block;
@@ -243,31 +262,46 @@ int mfocmain(uint32_t id) {
 					}
 				}
 				if ((t.sectors[i].foundKeyA) && (t.sectors[i].foundKeyB)) {
-					fprintf(stdout, "x");
+					Serial.print("X");
 				} else if (t.sectors[i].foundKeyA) {
-					fprintf(stdout, "/");
+					Serial.print("A");
 				} else if (t.sectors[i].foundKeyB) {
-					fprintf(stdout, "\\");
+					Serial.print("B");
 				} else {
-					fprintf(stdout, ".");
+					Serial.print(".");
 				}
-				fflush(stdout);
-				// fprintf(stdout, "\nSuccess: AUTH [Key %c:%012llx] sector %02x t_block %02x\n",
-				// 	(mc == MC_AUTH_A ? 'A' :'B'), bytes_to_num(mp.mpa.abtKey, 6), i, block);
+				Serial.flush();
+				
+				//Serial.print("\nSuccess: AUTH [Key ");
+				//Serial.print((mc == MC_AUTH_A ? 'A' :'B'));
+				//Serial.print(":");
+				//printHex(mp.mpa.abtKey, 6);
+				//Serial.print("] sector ");
+				//Serial.print(i, HEX);
+				//Serial.print(" t_block ");
+				//Serial.println(block, HEX);
+				
 				// Save position of a trailer block to sector struct
 				t.sectors[i++].trailer = block;
 			}
 		}
-		fprintf(stdout, "]\n");
+		Serial.println("]");
 	}
 
-	fprintf(stdout, "\n");
-	for (i = 0; i < (t.num_sectors); ++i) {
-			fprintf(stdout, "Sector %02d - %12s  ", i, ((t.sectors[i].foundKeyA) ? " FOUND_KEY   [A]" : " UNKNOWN_KEY [A]"));
-			fprintf(stdout, "Sector %02d - %12s  ", i, ((t.sectors[i].foundKeyB) ? " FOUND_KEY   [B]" : " UNKNOWN_KEY [B]"));
-			fprintf(stdout, "\n");
+	Serial.println();
+	
+	for (uint8_t i = 0; i < (t.num_sectors); ++i) {		
+			Serial.print("Sector ");
+			Serial.print(i, DEC);
+			Serial.print(" -");
+			Serial.print((t.sectors[i].foundKeyA) ? " FOUND_KEY   [A]" : " UNKNOWN_KEY [A]");
+		
+			Serial.print("Sector ");
+			Serial.print(i, DEC);
+			Serial.print(" -");
+			Serial.println((t.sectors[i].foundKeyB) ? " FOUND_KEY   [B]" : " UNKNOWN_KEY [B]");
 	}
-	fflush(stdout);
+	Serial.flush();
 
 	// Return the first (exploit) sector encrypted with the default key or -1 (we have all keys)
 	e_sector = find_exploit_sector(t);
@@ -298,9 +332,15 @@ int mfocmain(uint32_t id) {
 							memcpy(t.sectors[j].KeyB, mp.mpa.abtKey, sizeof(mp.mpa.abtKey));
 							t.sectors[j].foundKeyB = true;
 						}
-						printf("Sector: %d, type %c\n", j, (dumpKeysA ? 'A' : 'B'));
-						fprintf(stdout, "Found Key: %c [%012llx]\n", (dumpKeysA ? 'A' : 'B'),
-								bytes_to_num(mp.mpa.abtKey, 6));
+						
+						Serial.print("Sector: ");
+						Serial.print(j, DEC);
+						Serial.print(" type ");
+						Serial.println((dumpKeysA ? 'A' : 'B'));
+						Serial.print("Found Key:");
+						printHex(mp.mpa.abtKey, 6);
+						Serial.println();
+						
 						mf_configure(r.pdi);
 						mf_anticollision(t, r);
 						skip = true;
@@ -313,7 +353,16 @@ int mfocmain(uint32_t id) {
 				for (k = 0; k < probes; ++k) {
 					// Try to authenticate to exploit sector and determine distances (filling denonce.distances)
 					mf_enhanced_auth(e_sector, 0, t, r, &d, pk, 'd', dumpKeysA); // AUTH + Get Distances mode
-					printf("Sector: %d, type %c, probe %d, distance %d ", j, (dumpKeysA ? 'A' : 'B'), k, d.median);
+					
+					Serial.print("Sector: ");
+					Serial.print(j, DEC);
+					Serial.print(" type ");
+					Serial.println((dumpKeysA ? 'A' : 'B'));
+					Serial.print(" probe ");
+					Serial.print(k, DEC);
+					Serial.print(" distance ");
+					Serial.print(d.median, DEC);
+
 					// Configure device to the previous state
 					mf_configure(r.pdi);
 					mf_anticollision(t, r);
@@ -326,13 +375,14 @@ int mfocmain(uint32_t id) {
 						mf_enhanced_auth(e_sector, t.sectors[j].trailer, t, r, &d, pk, 'r', dumpKeysA);
 						mf_configure(r.pdi);
 						mf_anticollision(t, r);
-						fprintf(stdout, ".");
-						fflush(stdout);
+						Serial.print(".");
+						Serial.flush();
 					}
-					fprintf(stdout, "\n");
+					Serial.println();
+					
 					// Get first 15 grouped keys
 					ck = uniqsort(pk->possibleKeys, pk->size);
-					for (i = 0; i < TRY_KEYS ; i++) {
+					for (int i = 0; i < TRY_KEYS ; i++) {
 						// We don't known this key, try to break it
 						// This key can be found here two or more times
 						if (ck[i].count > 0) {
@@ -357,8 +407,13 @@ int mfocmain(uint32_t id) {
 									memcpy(t.sectors[j].KeyB, mp.mpa.abtKey, sizeof(mp.mpa.abtKey));
 									t.sectors[j].foundKeyB = true;
 								}
-								fprintf(stdout, "Found Key: %c [%012llx]\n", (dumpKeysA ? 'A' : 'B'),
-										bytes_to_num(mp.mpa.abtKey, 6));
+								
+								Serial.print("Found Key:");
+								Serial.print((dumpKeysA ? 'A' : 'B'));
+								Serial.print(" ");
+								printHex(mp.mpa.abtKey, 6);
+								Serial.println();
+
 								mf_configure(r.pdi);
 								mf_anticollision(t, r);
 								break;
@@ -372,8 +427,9 @@ int mfocmain(uint32_t id) {
 				}
 				// We haven't found any key, exiting
 				if ((dumpKeysA && !t.sectors[j].foundKeyA) || (!dumpKeysA && !t.sectors[j].foundKeyB)) {
-					ERR ("No success, maybe you should increase the probes");
-					goto error;
+					//No success, maybe you should increase the probes
+					nfc_perror (r.pdi, ERROR_NO_SUCCESS);
+					return -1;
 				}
 			}
 		}
@@ -381,17 +437,17 @@ int mfocmain(uint32_t id) {
 	}
 
 
-	for (i = 0; i < (t.num_sectors); ++i) {
+	for (int i = 0; i < (t.num_sectors); ++i) {
 		if ((dumpKeysA && !t.sectors[i].foundKeyA) || (!dumpKeysA && !t.sectors[i].foundKeyB)) {
-			fprintf(stdout, "\nTry again, there are still some encrypted blocks\n");
+			Serial.println("\nTry again, there are still some encrypted blocks");
 			succeed = 0;
 			break;
 		}
 	}
 
 	if (succeed) {
-		i = t.num_sectors; // Sector counter
-		fprintf(stdout, "Auth with all sectors succeeded, dumping keys to a file!\n");
+		int i = t.num_sectors; // Sector counter
+		Serial.println("Auth with all sectors succeeded, dumping keys to a file!\n");
 		// Read all blocks
 		for (block = t.num_blocks; block >= 0; block--) {
 			trailer_block(block) ? i-- : i;
@@ -405,8 +461,13 @@ int mfocmain(uint32_t id) {
 				mf_anticollision(t, r);
 			} else { // and Read
 				if (nfc_initiator_mifare_cmd(r.pdi, MC_READ, block, &mp)) {
-					fprintf(stdout, "Block %02d, type %c, key %012llx :", block, 'A', bytes_to_num(t.sectors[i].KeyA, 6));
+					
+					Serial.print("Block ");
+					Serial.print(block, HEX);
+					Serial.print(" type A");
+					printHex(t.sectors[i].KeyA, 16);
 					printHex(mp.mpd.abtData, 16);
+					
 					mf_configure(r.pdi);
 					mf_select_tag(r.pdi, &(t.nt));
 					failure = false;
@@ -422,8 +483,13 @@ int mfocmain(uint32_t id) {
 						mf_anticollision(t, r);
 					} else { // and Read
 						if (nfc_initiator_mifare_cmd(r.pdi, MC_READ, block, &mp)) {
-							fprintf(stdout, "Block %02d, type %c, key %012llx :", block, 'B', bytes_to_num(t.sectors[i].KeyB, 6));
+														
+							Serial.print("Block ");
+							Serial.print(block, HEX);
+							Serial.print(" type B");
+							printHex(t.sectors[i].KeyB, 16);
 							printHex(mp.mpd.abtData, 16);
+
 							mf_configure(r.pdi);
 							mf_select_tag(r.pdi, &(t.nt));
 							failure = false;
@@ -459,52 +525,48 @@ int mfocmain(uint32_t id) {
 	nfc_close(r.pdi);
     nfc_exit(NULL);
     exit (EXIT_SUCCESS);
-	
-error:
-    nfc_close(r.pdi);
-    nfc_exit(NULL);
-    exit (EXIT_FAILURE);
 }
 
 
-void mf_init(mfreader *r) {
+int mf_init(mfreader *r) {
 	// Connect to the first NFC device
 	nfc_init(NULL);
 	r->pdi = nfc_open(NULL, NULL);
 	if (!r->pdi) {
-		printf ("No NFC device found.\n");
-		exit (EXIT_FAILURE);
+		Serial.println("No NFC device found.");
+		return -1;
 	}
+	return 0;
 }
 
 void mf_configure(nfc_device* pdi) {
 	if (nfc_initiator_init (pdi) < 0) {
 		nfc_perror (pdi, ERROR_NFC_INITIATOR_INIT);
-		exit (EXIT_FAILURE);
+		swreset();
 	}
 	// Drop the field for a while, so can be reset
 	if (nfc_device_set_property_bool(pdi, NP_ACTIVATE_FIELD, false) < 0) {
 		nfc_perror (pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_ACTIVATE_FIELD);
-		exit (EXIT_FAILURE);
+		swreset();
 	}
 	// Let the reader only try once to find a tag
 	if (nfc_device_set_property_bool(pdi, NP_INFINITE_SELECT, false) < 0) {
 		nfc_perror (pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_INFINITE_SELECT);
-		exit (EXIT_FAILURE);
+		swreset();
 	}
 	// Configure the CRC and Parity settings
 	if (nfc_device_set_property_bool(pdi, NP_HANDLE_CRC, true) < 0) {
 		nfc_perror (pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_CRC);
-		exit (EXIT_FAILURE);
+		swreset();
 	}
 	if (nfc_device_set_property_bool(pdi, NP_HANDLE_PARITY, true) < 0) {
 		nfc_perror (pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_PARITY);
-		exit (EXIT_FAILURE);
+		swreset();
 	}
 	// Enable the field so more power consuming cards can power themselves up
 	if (nfc_device_set_property_bool(pdi, NP_ACTIVATE_FIELD, true) < 0) {
 		nfc_perror (pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_ACTIVATE_FIELD);
-		exit (EXIT_FAILURE);
+		swreset();
 	}
 }
 
@@ -517,10 +579,8 @@ void mf_select_tag(nfc_device* pdi, nfc_target* pnt) {
 	const nfc_modulation nm = { /*.nmt = */ NMT_ISO14443A, /*.nbr = */ NBR_106 };
 	
 	if (nfc_initiator_select_passive_target(pdi, nm, NULL, 0, pnt) < 0) {
-		ERR ("Unable to connect to the MIFARE Classic tag");
-		nfc_close(pdi);
-        nfc_exit(NULL);
-		exit (EXIT_FAILURE);
+		//Serial.println("Unable to connect to the MIFARE Classic tag");
+		swreset();
 	}
 }
 
@@ -542,17 +602,19 @@ int find_exploit_sector(mftag t) {
 		}
 	}
 	if (!interesting) {
-		fprintf(stdout, "\nWe have all sectors encrypted with the default keys..\n\n");
+		Serial.print("\nWe have all sectors encrypted with the default keys..\n\n");
 		return -1;
 	}
 	for (i = 0; i < t.num_sectors; i++) {
 		if ((t.sectors[i].foundKeyA) || (t.sectors[i].foundKeyB)) {
-			fprintf(stdout, "\n\nUsing sector %02d as an exploit sector\n", i);
+			Serial.print("\n\nUsing sector ");
+			Serial.print(i, DEC);
+			Serial.println("as an exploit sector");
 			return i;
 		}
 	}
-	ERR ("\n\nNo sector encrypted with the default key has been found, exiting..");
-	exit (EXIT_FAILURE);
+	//Serial.print("\n\nNo sector encrypted with the default key has been found, exiting..");
+	swreset();
 }
 
 void mf_anticollision(mftag t, mfreader r) {
@@ -564,8 +626,8 @@ void mf_anticollision(mftag t, mfreader r) {
 	
 	if (nfc_initiator_select_passive_target(r.pdi, nm, NULL, 0, &t.nt) < 0) {
 		nfc_perror (r.pdi, ERROR_NFC_INITIATOR_SELECT_PASSIVE_TARGET);
-		ERR ("Tag has been removed");
-		exit (EXIT_FAILURE);
+		Serial.print("Tag has been removed");
+		swreset();
 	}
 }
 
@@ -604,24 +666,25 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 	// We need full control over the CRC
 	if (nfc_device_set_property_bool(r.pdi, NP_HANDLE_CRC, false) < 0)  {
 		nfc_perror (r.pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_CRC);
-		exit (EXIT_FAILURE);
+		swreset();
 	}
 
 	// Request plain tag-nonce
 	// TODO: Set NP_EASY_FRAMING option only once if possible
 	if (nfc_device_set_property_bool (r.pdi, NP_EASY_FRAMING, false) < 0) {
 		nfc_perror (r.pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_FRAMING);
-		exit (EXIT_FAILURE);
+		swreset();
 	}
 
 	if (nfc_initiator_transceive_bytes(r.pdi, Auth, 4, Rx, sizeof(Rx), 0) < 0) {
-		fprintf(stdout, "Error while requesting plain tag-nonce\n");
-		exit(EXIT_FAILURE);
+		//Error while requesting plain tag-nonce
+		nfc_perror (r.pdi, ERROR_NFC_INITIATOR_TRANSCEIVE_BYTES);
+		swreset();
 	}
 
 	if (nfc_device_set_property_bool (r.pdi, NP_EASY_FRAMING, true) < 0) {
 		nfc_perror (r.pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_FRAMING);
-		exit (EXIT_FAILURE);
+		swreset();
 	}
 	// printHex(Rx, 4);
 
@@ -658,34 +721,36 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 	// Finally we want to send arbitrary parity bits
 	if (nfc_device_set_property_bool(r.pdi, NP_HANDLE_PARITY, false) < 0) {
 		nfc_perror (r.pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_PARITY);
-		exit (EXIT_FAILURE);
+		swreset();
 	}
 
 	// Transmit reader-answer
-	// fprintf(stdout, "\t{Ar}:\t");
+	// Serial.print("\t{Ar}:\t");
 	// printHex_par(ArEnc, 64, ArEncPar);
 	int res;
 	if (((res = nfc_initiator_transceive_bits(r.pdi, ArEnc, 64, ArEncPar, Rx, RxPar)) < 0) || (res != 32)) {
-		ERR ("Reader-answer transfer error, exiting..");
-		exit (EXIT_FAILURE);
+		//Reader-answer transfer error, exiting..
+		nfc_perror (r.pdi, ERROR_NFC_INITIATOR_TRANSCEIVE_BYTES);
+		swreset();
 	}
 
 	// Now print the answer from the tag
-	// fprintf(stdout, "\t{At}:\t");
+	// Serial.print("\t{At}:\t");
 	// printHex_par(Rx,RxLen,RxPar);
 
 	// Decrypt the tag answer and verify that suc3(Nt) is At
 	Nt = prng_successor(Nt, 32);
 	if (!((crypto1_word(pcs, 0x00, 0) ^ bytes_to_num(Rx, 4)) == (Nt&0xFFFFFFFF))) {
-		ERR ("[At] is not Suc3(Nt), something is wrong, exiting..");
-		exit (EXIT_FAILURE);
+		Serial.println("[At] is not Suc3(Nt), something is wrong, exiting..");
+		swreset();
 	}
-	// fprintf(stdout, "Authentication completed.\n\n");
+	// Serial.print("Authentication completed.\n\n");
 
 	// If we are in "Get Distances" mode
 	if (mode == 'd') {
 		for (m = 0; m < d->num_distances; m++) {
-			// fprintf(stdout, "Nested Auth number: %x: ,", m);
+			// Serial.print("Nested Auth number: ");
+			// Serial.print(m, HEX);
 			// Encrypt Auth command with the current keystream
 			for (i = 0; i < 4; i++) {
 		                AuthEnc[i] = crypto1_byte(pcs,0x00,0) ^ Auth[i];
@@ -695,8 +760,9 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 
 			// Sending the encrypted Auth command
 			if (nfc_initiator_transceive_bits(r.pdi, AuthEnc, 32, AuthEncPar,Rx, RxPar) < 0) {
-				fprintf(stdout, "Error requesting encrypted tag-nonce\n");
-				exit (EXIT_FAILURE);
+				//Error requesting encrypted tag-nonce
+				nfc_perror (r.pdi, ERROR_NFC_INITIATOR_TRANSCEIVE_BYTES);				
+				swreset();
 			}
 
 			// Decrypt the encrypted auth
@@ -709,7 +775,8 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 
 			// Save the determined nonces distance
 			d->distances[m] = nonce_distance(Nt, NtLast);
-			// fprintf(stdout, "distance: %05d\n", d->distances[m]);
+			//Serial.print("distance: ");
+			//Serial.println(d->distances[m], DEC);
 
 			// Again, prepare and send {At}
 			for (i = 0; i < 4; i++) {
@@ -724,19 +791,20 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 			}
 			nfc_device_set_property_bool(r.pdi,NP_HANDLE_PARITY,false);
 			if (((res = nfc_initiator_transceive_bits(r.pdi, ArEnc, 64, ArEncPar, Rx, RxPar)) < 0) || (res != 32)) {
-				ERR ("Reader-answer transfer error, exiting..");
-				exit (EXIT_FAILURE);
+				//Reader-answer transfer error, exiting..
+				nfc_perror (r.pdi, ERROR_NFC_INITIATOR_TRANSCEIVE_BYTES);	
+				swreset();
 			}
 			Nt = prng_successor(Nt, 32);
 			if (!((crypto1_word(pcs, 0x00, 0) ^ bytes_to_num(Rx, 4)) == (Nt&0xFFFFFFFF))) {
-				ERR ("[At] is not Suc3(Nt), something is wrong, exiting..");
-				exit (EXIT_FAILURE);
+				//[At] is not Suc3(Nt), something is wrong, exiting.."
+				swreset();
 			}
 		} // Next auth probe
 
 		// Find median from all distances
 		d->median = median(*d);
-		//fprintf(stdout, "Median: %05d\n", d->median);
+		//Serial.print("Median: %05d\n", d->median);
 	} // The end of Get Distances mode
 
 	// If we are in "Get Recovery" mode
@@ -753,19 +821,20 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 			AuthEncPar[i] = filter(pcs->odd) ^ oddparity(Auth[i]);
 		}
 		if (nfc_initiator_transceive_bits(r.pdi, AuthEnc, 32, AuthEncPar,Rx, RxPar) < 0) {
-			ERR ("while requesting encrypted tag-nonce");
-			exit (EXIT_FAILURE);
+			//"while requesting encrypted tag-nonce"
+			nfc_perror (r.pdi, ERROR_NFC_INITIATOR_TRANSCEIVE_BYTES);	
+			swreset();
 		}
 
 		// Finally we want to send arbitrary parity bits
 		if (nfc_device_set_property_bool(r.pdi, NP_HANDLE_PARITY, true) < 0)  {
 			nfc_perror (r.pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_PARITY_RESTORE_M);
-			exit (EXIT_FAILURE);
+			swreset();
 		}
 
 		if (nfc_device_set_property_bool(r.pdi, NP_HANDLE_CRC, true) < 0)  {
 			nfc_perror (r.pdi, ERROR_NFC_DEVICE_SET_PROPERTY_BOOL_CRC_RESTORE_M);
-			exit (EXIT_FAILURE);
+			swreset();
 		}
 
 		// Save the encrypted nonce
@@ -801,8 +870,9 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 						// fprintf(stdout, "New chunk by %d, sizeof %lu\n", kcount, pk->size * sizeof(uint64_t));
 						pk->possibleKeys = (uint64_t *) realloc((void *)pk->possibleKeys, pk->size * sizeof(uint64_t));
 						if (pk->possibleKeys == NULL) {
-							ERR ("Memory allocation error for pk->possibleKeys");
-							exit (EXIT_FAILURE);
+							//Memory allocation error for pk->possibleKeys
+							nfc_perror (r.pdi, ERROR_MEMORY_ALLOCATION);	
+							swreset();
 						}
 					}
 					pk->possibleKeys[kcount] = lfsr;
@@ -817,8 +887,9 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 		if (kcount != 0) {
 			pk->size = --kcount;
 			if ((pk->possibleKeys = (uint64_t *) realloc((void *)pk->possibleKeys, pk->size * sizeof(uint64_t))) == NULL) {
-				ERR ("Memory allocation error for pk->possibleKeys");
-				exit (EXIT_FAILURE);
+				//Memory allocation error for pk->possibleKeys
+				nfc_perror (r.pdi, ERROR_MEMORY_ALLOCATION);	
+				swreset();
 			}
 		}
 	}
@@ -859,7 +930,7 @@ countKeys * uniqsort(uint64_t * possibleKeys, uint32_t size) {
 	our_counts = (countKeys*)calloc(size, sizeof(countKeys));
 	if (our_counts == NULL) {
 		ERR ("Memory allocation error for our_counts");
-		exit (EXIT_FAILURE);
+		swreset();
 	}
 
 	for (i = 0; i < size; i++) {

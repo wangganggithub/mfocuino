@@ -58,7 +58,7 @@ int nfc_initiator_transceive_bits(nfc_device *pnd, const uint8_t *pbtTx, const s
   /* NFC target: act as tag (i.e. MIFARE Classic) or NFC target device. */
 
   /* Error reporting */
-void nfc_perror(const nfc_device *pnd, int error);
+void nfc_perror(nfc_device *pnd, int error);
 
   /* Special data accessors */
 

@@ -11,9 +11,11 @@ int nfc_device_set_property_bool(nfc_device *pnd, const nfc_property property, c
 	return 0;
 }
 
-void nfc_perror(const nfc_device *pnd, int error) {
-	//Serial.print("Error :");
-	//Serial.println(error, DEC);
+void nfc_perror(nfc_device *pnd, int error) {
+	Serial.print("Error :");
+	Serial.println(error, DEC);
+    nfc_close(pnd);
+    nfc_exit(NULL);
 }
 
 int nfc_initiator_transceive_bytes(nfc_device *pnd, const uint8_t *pbtTx, const size_t szTx, uint8_t *pbtRx, const size_t szRx, int timeout) {
