@@ -294,6 +294,31 @@ uint32_t PN532::readPassiveTargetID(uint8_t cardbaudrate) {
     return cid;
 }
 
+uint32_t PN532::readRegister(uint16_t address, uint8_t* value){
+    pn532_packetbuffer[0] = PN532_READREGISTER;
+    pn532_packetbuffer[1] = address >> 8; 
+    pn532_packetbuffer[2] = address & 0xff;
+
+    if (!sendCommandCheckAck(pn532_packetbuffer, 3))
+        return 0;
+    
+    // read data packet
+    readspidata(pn532_packetbuffer, 2);
+    *value = pn532_packetbuffer[0];
+    return 1;
+}
+
+uint32_t PN532::writeRegister(uint16_t address, uint8_t value){
+    pn532_packetbuffer[0] = PN532_WRITEREGISTER;
+    pn532_packetbuffer[1] = address >> 8; 
+    pn532_packetbuffer[2] = address & 0xff;
+    pn532_packetbuffer[3] = value;
+
+    if (!sendCommandCheckAck(pn532_packetbuffer, 4))
+        return 0;
+
+    return 1;
+}
 
 /************** high level SPI */
 
