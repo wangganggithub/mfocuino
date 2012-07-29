@@ -110,6 +110,22 @@ def getAvailableBoards(ctx):
 	except Exception, e:
 		print e;
 
+def checkArduinoIdeVersion(ctx):
+	revisionfile = os.path.abspath(ctx.env.ARDUINO_PATH + '/revisions.txt')
+	try:
+		rev = open(revisionfile, "r");
+		#read the first line (should be ARDUINO {version} - {date}
+		line = rev.readline()
+		if line.startswith('ARDUINO'):
+			version = line.split(' ')[1].strip()
+			ctx.msg('Checking arduino version', version)
+			version = version.replace('.', '')
+			ctx.env.ARDUINO_IDE_VERSION = version
+			return
+	except Exception, e:
+		pass
+	ctx.msg('Checking arduino version', 'not found', 'YELLOW')
+
 def options(opt):
 	opt.load('compiler_c')
 	opt.load('compiler_cxx')
@@ -124,9 +140,7 @@ def boards(ctx):
 		Logs.pprint('NORMAL', "%s : %s" % (b.ljust(max(15, len(b))), arduinos[b]['name']))
 
 
-def configure(conf):
-	arduinoIdeVersion = '101' #todo get arduino ide version automatically
-	
+def configure(conf):	
 	searchpath = []
 	relBinPath = ['hardware/tools/', 'hardware/tools/avr/bin/']
 	relIncPath = ['hardware/arduino/cores/arduino/', 'hardware/arduino/variants/standard/']
@@ -149,7 +163,7 @@ def configure(conf):
 			conf.env.AVRDUDECONF = avrdudeconf
 	
 	for p in relIncPath:
-		path = os.path.abspath(Options.options.idepath + '/' + p)
+		path = os.path.abspath(conf.env.ARDUINO_PATH + '/' + p)
 		if os.path.exists(path):
 			conf.env.INCLUDES += [path]
 
@@ -184,12 +198,15 @@ def configure(conf):
 	arduino = arduinos[Options.options.board]
 	conf.env.ARDUINO = arduino
 	
+	checkArduinoIdeVersion(conf)
 	conf.msg('Arduino ', '%s' % arduino['name'], 'BLUE')
-		
+	
 	flags = ['-g', '-Os' , '-w' , '-Wall', '-std=c99', '-fno-exceptions', '-ffunction-sections' , '-fdata-sections', '-mmcu=%s' % conf.env.ARDUINO['build.mcu'], '-MMD']
 	conf.env.CFLAGS = flags
 	conf.env.CXXFLAGS = flags
-	conf.env.DEFINES = ['F_CPU=%s' % conf.env.ARDUINO['build.f_cpu'], 'USB_VID=null', 'USB_PID=null', 'ARDUINO=%s' % arduinoIdeVersion]
+	conf.env.DEFINES = ['F_CPU=%s' % conf.env.ARDUINO['build.f_cpu'], 'USB_VID=null', 'USB_PID=null']
+	if conf.env.ARDUINO_IDE_VERSION:
+		conf.env.DEFINES += ['ARDUINO=%s' % conf.env.ARDUINO_IDE_VERSION]
 	conf.env.LINKFLAGS = ['-Wl,--gc-sections', '-mmcu=%s' % conf.env.ARDUINO['build.mcu']]
 	
 	conf.env.INCLUDES += ['libraries']

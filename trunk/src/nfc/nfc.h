@@ -29,12 +29,6 @@
 #ifndef _LIBNFC_H_
 #define _LIBNFC_H_
 
-#include <sys/time.h>
-
-#include <stdint.h>
-#include <stdbool.h>
-
-
 #include <nfc/nfc-types.h>
 
 #ifdef __cplusplus

@@ -20,17 +20,6 @@
 #include "crapto1.h"
 #include <stdlib.h>
 
-#if !defined LOWMEM && defined __GNUC__
-static uint8_t filterlut[1 << 20];
-static void __attribute__((constructor)) fill_lut(void)
-{
-        uint32_t i;
-        for(i = 0; i < 1 << 20; ++i)
-                filterlut[i] = filter(i);
-}
-#define filter(x) (filterlut[(x) & 0xfffff])
-#endif
-
 static void quicksort(uint32_t* const start, uint32_t* const stop)
 {
 	uint32_t *it = start + 1, *rit = stop;
