@@ -4,6 +4,7 @@
 // authenticateBlock, readMemoryBlock, writeMemoryBlock contributed
 // by Seeed Technology Inc (www.seeedstudio.com)
 
+
 #if defined(ARDUINO) && ARDUINO >= 100
 #include "Arduino.h"
 #else
@@ -18,13 +19,18 @@ byte pn532response_firmwarevers[] = {0x00, 0xFF, 0x06, 0xFA, 0xD5, 0x03};
 
 #define PN532_PACKBUFFSIZ 64
 byte pn532_packetbuffer[PN532_PACKBUFFSIZ];
+#define PN532_CS 10
 
 PN532::PN532(uint8_t clk, uint8_t miso, uint8_t mosi, uint8_t ss) {
     _clk = clk;
     _miso = miso;
     _mosi = mosi;
+    #if defined(__AVR_ATmega1280__)|| defined(__AVR_ATmega2560__)
+    _ss = PN532_CS;
+    pinMode(ss, OUTPUT);
+    #else
     _ss = ss;
-
+    #endif
     pinMode(_ss, OUTPUT);
     pinMode(_clk, OUTPUT);
     pinMode(_mosi, OUTPUT);
