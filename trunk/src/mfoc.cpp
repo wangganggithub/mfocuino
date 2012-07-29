@@ -320,8 +320,16 @@ int mfocmain(uint32_t id) {
 					num_to_bytes(bk->brokenKeys[o], 6, mp.mpa.abtKey);
 					mc = (mifare_cmd)(dumpKeysA ? 0x60 : 0x61);
 					if (!nfc_initiator_mifare_cmd(r.pdi,mc,t.sectors[j].trailer,&mp)) {
-					//	fprintf(stdout, "!!Error: AUTH [Key A:%012llx] sector %02x t_block %02x, key %d\n",
-					//			bytes_to_num(mp.mpa.abtKey, 6), j, t.sectors[j].trailer, o);
+
+						//Serial.print("!!Error: AUTH [Key A:");
+						//printHex(mp.mpa.abtKey, 6);
+						//Serial.print("] sector ");
+						//Serial.print(i, HEX);
+						//Serial.print(" t_block ");
+						//Serial.print(block, HEX);
+						//Serial.print(" key ");
+						//Serial.println(o, DEC);	
+						
 						mf_anticollision(t, r);
 					} else {
 						// Save all information about successfull authentization
@@ -386,13 +394,22 @@ int mfocmain(uint32_t id) {
 						// We don't known this key, try to break it
 						// This key can be found here two or more times
 						if (ck[i].count > 0) {
-							// fprintf(stdout,"%d %llx\n",ck[i].count, ck[i].key);
+							
+							//Serial.print(ck[i].count, DEC);
+							//Serial.println(ck[i].key, HEX);
+														
 							// Set required authetication method
 							num_to_bytes(ck[i].key, 6, mp.mpa.abtKey);
 							mc = (mifare_cmd)(dumpKeysA ? 0x60 : 0x61);
 							if (!nfc_initiator_mifare_cmd(r.pdi,mc,t.sectors[j].trailer,&mp)) {
-								// fprintf(stdout, "!!Error: AUTH [Key A:%llx] sector %02x t_block %02x\n",
-								// 	bytes_to_num(mp.mpa.abtKey, 6), j, t.sectors[j].trailer);
+
+								//Serial.print("!!Error: AUTH [Key A:");
+								//printHex(mp.mpa.abtKey, 6);
+								//Serial.print("] sector ");
+								//Serial.print(j, HEX);
+								//Serial.print(" t_block ");
+								//Serial.println(t.sectors[j].trailer, HEX);
+								
 								mf_anticollision(t, r);
 							} else {
 								// Save all information about successfull authentization
@@ -660,7 +677,7 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 	// Prepare AUTH command
 	Auth[0] = (t.sectors[e_sector].foundKeyA) ? 0x60 : 0x61;
 	iso14443a_crc_append (Auth,2);
-	// fprintf(stdout, "\nAuth command:\t");
+	// Serial.print("\nAuth command:\t");
 	// printHex(Auth, 4);
 
 	// We need full control over the CRC
@@ -846,7 +863,11 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 		}
 
 		// Iterate over Nt-x, Nt+x
-		// fprintf(stdout, "Iterate from %d to %d\n", d->median-TOLERANCE, d->median+TOLERANCE);
+		//Serial.print("Iterate from ");
+		//Serial.print(d->median-TOLERANCE, DEC);
+		//Serial.print(" to ");
+		//Serial.println(d->median+TOLERANCE, DEC);
+		
 		NtProbe = prng_successor(Nt, d->median-d->tolerance);
 		for (m = d->median-d->tolerance; m <= d->median+d->tolerance; m +=2) {
 
@@ -867,7 +888,12 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 					// Allocate a new space for keys
 					if (((kcount % MEM_CHUNK) == 0) || (kcount >= pk->size)) {
 						pk->size += MEM_CHUNK;
-						// fprintf(stdout, "New chunk by %d, sizeof %lu\n", kcount, pk->size * sizeof(uint64_t));
+						
+						//Serial.print("New chunk by ");
+						//Serial.print(kcount, DEC);
+						//Serial.print("n sizeof ");
+						//Serial.println(pk->size * sizeof(uint64_t), DEC);
+						
 						pk->possibleKeys = (uint64_t *) realloc((void *)pk->possibleKeys, pk->size * sizeof(uint64_t));
 						if (pk->possibleKeys == NULL) {
 							//Memory allocation error for pk->possibleKeys
