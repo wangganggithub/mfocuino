@@ -5,7 +5,7 @@
 top = '.'
 out = 'build'
 
-import os, sys, platform, serial
+import os, sys, platform
 
 from waflib import Task, Options, Logs
 from waflib.TaskGen import feature, after
@@ -240,28 +240,48 @@ def upload(ctx):
 	
 def monitor(ctx):
 	"""This is meant to be an equivalent to the Arduino serial monitor."""
-	import select
-	try:
-		while 1:
-			#todo make options for serial parameter 
-			#ser = serial.Serial("/dev/ttyACM0", 115200)
-			ser = serial.Serial('/dev/ttyACM0', 9600)
-			
-			# Check whether the user has typed anything (timeout of .2 sec):
-			inp, outp, err = select.select([sys.stdin, ser], [], [], .2)
+	import serial, select
+	# Port may vary, so look for it:
+	baseports = ['/dev/ttyUSB', '/dev/ttyACM']
+	baud = 9600
+	ser = None
+	for baseport in baseports :
+		if ser : break
+		for i in xrange(0, 8) :
+			try :
+				port = baseport + str(i)
+				ser = serial.Serial(port, baud, timeout=1)
+				Logs.pprint('GREEN', "Opened %s" % port)
+				break
+			except :
+				ser = None
+				pass
 
-			# If the user has typed anything, send it to the Arduino:
+	if not ser :
+		ctx.fatal("Couldn't open a serial port")
+
+	ser.flushInput()
+	
+	Logs.pprint('GREEN', 'Arduino Monitor :')
+	
+	try:
+		while True :
+			# Check whether the user has typed anything:
+			inp, outp, err = select.select([sys.stdin, ser], [], [], .2)
+			# Check for user input:
 			if sys.stdin in inp :
 				line = sys.stdin.readline()
 				ser.write(line)
-
-			# If the Arduino has printed anything, display it:
+			# check for Arduino output:
 			if ser in inp :
-				line = ser.readline().strip()		
-				print ser.readline()
-
+				line = ser.readline().strip()
+				print line
+	except KeyboardInterrupt :
 		ser.close()
+		Logs.pprint('GREEN', '\n%s closed' % port)
+		return
 	except Exception, e:
+		ser.close()
 		Logs.pprint('RED', e)
 
 
