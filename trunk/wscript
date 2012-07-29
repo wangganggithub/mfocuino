@@ -11,14 +11,14 @@ from waflib import Task, Options, Logs
 from waflib.TaskGen import feature, after
 from waflib.TaskGen import extension
 
-@extension('.pde')
-def process_pde(self, node):
+@extension('.pde', '.ino')
+def process_pde_ino(self, node):
 	if 'cxx' in self.features:
 		cppnode = node.change_ext('.cpp');
-		self.create_task('pde', node, cppnode)
+		self.create_task('ino', node, cppnode)
 		self.source.append(cppnode)
 		
-class pde(Task.Task):
+class ino(Task.Task):
 	color = 'GREEN'
 	
 	def run(self):
@@ -209,7 +209,7 @@ def build(bld):
 	bld.add_pre_fun(buildArduinoCore)
 
 	#build arduino project
-	src = bld.path.ant_glob(['src/**/*.pde', 'src/**/*.c', 'src/**/*.cpp', 'libraries/**/*.cpp'])
+	src = bld.path.ant_glob(['src/**/*.pde', 'src/**/*.ino', 'src/**/*.c', 'src/**/*.cpp', 'libraries/**/*.cpp'])
 	bld(features = 'c cxx cxxprogram',
 		includes = 'src',
 		source = src, 
