@@ -98,6 +98,7 @@ void printHexChar(const uint8_t * data, const uint32_t numBytes) {
 #define SAK_ISO14443_4_COMPLIANT 0x20
 #define SAK_ISO18092_COMPLIANT   0x40
 
+/**
 void
 print_nfc_iso14443a_info (const nfc_iso14443a_info nai, bool verbose) {
 	printf ("    ATQA (SENS_RES): ");
@@ -687,4 +688,4 @@ print_nfc_target (const nfc_target nt, bool verbose) {
 			break;
 	}
 }
-
+**/
