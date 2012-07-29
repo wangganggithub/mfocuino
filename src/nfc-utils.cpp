@@ -35,7 +35,6 @@
 #endif
 
 #include <nfc/nfc.h>
-#include <err.h>
 
 #include "nfc-utils.h"
 
