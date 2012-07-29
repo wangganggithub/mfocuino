@@ -20,6 +20,8 @@
 
 #define PN532_FIRMWAREVERSION 0x02
 #define PN532_GETGENERALSTATUS 0x04
+#define PN532_READREGISTER 0x06
+#define PN532_WRITEREGISTER 0x08
 #define PN532_SAMCONFIGURATION  0x14
 #define PN532_INLISTPASSIVETARGET 0x4A
 #define PN532_INDATAEXCHANGE 0x40
@@ -62,6 +64,9 @@ public:
     uint32_t writeMemoryBlock(uint8_t cardnumber /*1 or 2*/,uint8_t blockaddress /*0 to 63*/, uint8_t * block);
 
     boolean sendCommandCheckAck(uint8_t *cmd, uint8_t cmdlen, uint16_t timeout = 1000);
+
+    uint32_t readRegister(uint16_t address, uint8_t* value);
+    uint32_t writeRegister(uint16_t address, uint8_t value);
 
     //
 
