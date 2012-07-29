@@ -89,20 +89,6 @@ def makeUploadArduinoProgram(self):
 	hexnode = elfnode.change_ext(".hex")
 	self.create_task('eep', elfnode, eepnode)
 	self.create_task('hex', elfnode, hexnode)
-	if Options.options.upload:
-		import subprocess
-	
-		cmd = [self.env.AVRDUDE]
-		cmd += ['-C%s' % self.env.AVRDUDECONF]
-		cmd += ['-v']
-		cmd += ['-p%s' % self.env.ARDUINO['build.mcu']]
-		cmd += ['-carduino']
-		cmd += ['-P/dev/ttyACM0']
-		cmd += ['-b%s' % self.env.ARDUINO['upload.speed']]
-		cmd += ['-D']
-		cmd += ['-Uflash:w:%s:i' % hexnode.abspath()]
-		subprocess.call(cmd)
-
 
 def getAvailableBoards(ctx):
 	boardsfile = os.path.abspath(ctx.env.ARDUINO_PATH + '/hardware/arduino/boards.txt')
@@ -127,9 +113,8 @@ def getAvailableBoards(ctx):
 def options(opt):
 	opt.load('compiler_c')
 	opt.load('compiler_cxx')
-	opt.add_option('--upload', action='store_true', default=False, help='Upload on target', dest='upload')
 	opt.add_option('--path', action='store', default='', help='path of the arduino ide', dest='idepath')
-	opt.add_option('--arduino', action='store', default='uno', help='Arduino Board (uno, mega, ...)', dest='board')
+	opt.add_option('--arduino', action='store', default='uno', help='Arduino Board (uno, mega, ...), default=uno', dest='board')
 
 def boards(ctx):
 	"""display available arduino boards """
@@ -232,22 +217,59 @@ def build(bld):
 		lib = 'm',
 		use = 'core',
 	)
+
+def upload(ctx):
+	"""Upload to arduino."""
+	hexnode = ctx.bldnode.find_node('mfocuino.elf')
+	if not hexnode:
+		Options.commands = ['build', 'upload'] + Options.commands
+		return
+
+	import subprocess	
+	cmd = [ctx.env.AVRDUDE]
+	cmd += ['-C%s' % ctx.env.AVRDUDECONF]
+	cmd += ['-v']
+	cmd += ['-p%s' % ctx.env.ARDUINO['build.mcu']]
+	cmd += ['-carduino']
+	cmd += ['-P/dev/ttyACM0']
+	cmd += ['-b%s' % ctx.env.ARDUINO['upload.speed']]
+	cmd += ['-D']
+	cmd += ['-Uflash:w:%s:i' % hexnode.abspath()]
+	print " ".join(cmd)
+	subprocess.call(cmd)
 	
 def monitor(ctx):
-	"""Start `screen` on the serial device.  This is meant to be an equivalent to the Arduino serial monitor."""
-	#todo
-	#wait serial is available
+	"""This is meant to be an equivalent to the Arduino serial monitor."""
+	import select
 	try:
-		#ser = serial.Serial("/dev/ttyACM0", 115200)
-		ser = serial.Serial('/dev/ttyACM0', 9600)
 		while 1:
-			print ser.readline()
+			#todo make options for serial parameter 
+			#ser = serial.Serial("/dev/ttyACM0", 115200)
+			ser = serial.Serial('/dev/ttyACM0', 9600)
+			
+			# Check whether the user has typed anything (timeout of .2 sec):
+			inp, outp, err = select.select([sys.stdin, ser], [], [], .2)
+
+			# If the user has typed anything, send it to the Arduino:
+			if sys.stdin in inp :
+				line = sys.stdin.readline()
+				ser.write(line)
+
+			# If the Arduino has printed anything, display it:
+			if ser in inp :
+				line = ser.readline().strip()		
+				print ser.readline()
+
 		ser.close()
 	except Exception, e:
 		Logs.pprint('RED', e)
 
 
 from waflib.Build import BuildContext
-class boardslist(BuildContext):
+class BoardsList(BuildContext):
 	cmd = 'boards'
 	fun = 'boards'
+
+class Upload(BuildContext):
+	cmd = 'upload'
+	fun = 'upload'
