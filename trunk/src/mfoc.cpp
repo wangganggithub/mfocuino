@@ -105,9 +105,6 @@ int mfocmain(uint32_t id) {
 	pKeys		*pk;
 	countKeys	*ck;
 
-	// Pointer to already broken keys, except defaults
-	bKeys		*bk;
-
 	static mifare_param mp;
  	static mifare_classic_tag mtDump;
 
@@ -175,13 +172,6 @@ int mfocmain(uint32_t id) {
 	if ((pk = (pKeys*) malloc(sizeof(pKeys))) == NULL) {
 		nfc_perror (r.pdi, ERROR_MEMORY_ALLOCATION);
 		return -1;
-	}
-	if ((bk = (bKeys*) malloc(sizeof(bKeys))) == NULL) {
-		nfc_perror (r.pdi, ERROR_MEMORY_ALLOCATION);
-		return -1;
-	} else {
-		bk->brokenKeys = NULL;
-		bk->size = 0;
 	}
 
 	d.distances = (uint32_t*) calloc(d.num_distances, sizeof(uint32_t));
@@ -304,49 +294,6 @@ int mfocmain(uint32_t id) {
 			memcpy(mp.mpa.abtAuthUid, t.nt.nti.nai.abtUid + t.nt.nti.nai.szUidLen - 4, sizeof(mp.mpa.abtAuthUid));
 			if ((dumpKeysA && !t.sectors[j].foundKeyA) || (!dumpKeysA && !t.sectors[j].foundKeyB)) {
 
-				// First, try already broken keys
-				skip = false;
-				for (uint32_t o = 0; o < bk->size; o++) {
-					num_to_bytes(bk->brokenKeys[o], 6, mp.mpa.abtKey);
-					mc = (mifare_cmd)(dumpKeysA ? 0x60 : 0x61);
-					if (!nfc_initiator_mifare_cmd(r.pdi,mc,t.sectors[j].trailer,&mp)) {
-
-						//Serial.print("!!Error: AUTH [Key A:");
-						//printHex(mp.mpa.abtKey, 6);
-						//Serial.print("] sector ");
-						//Serial.print(i, HEX);
-						//Serial.print(" t_block ");
-						//Serial.print(block, HEX);
-						//Serial.print(" key ");
-						//Serial.println(o, DEC);	
-						
-						mf_anticollision(t, r);
-					} else {
-						// Save all information about successfull authentization
-						if (dumpKeysA) {
-							memcpy(t.sectors[j].KeyA, mp.mpa.abtKey, sizeof(mp.mpa.abtKey));
-							t.sectors[j].foundKeyA = true;
-						} else {
-							memcpy(t.sectors[j].KeyB, mp.mpa.abtKey, sizeof(mp.mpa.abtKey));
-							t.sectors[j].foundKeyB = true;
-						}
-						
-						Serial.print("Sector: ");
-						Serial.print(j, DEC);
-						Serial.print(" type ");
-						Serial.println((dumpKeysA ? 'A' : 'B'));
-						Serial.print("Found Key:");
-						printHex(mp.mpa.abtKey, 6);
-						Serial.println();
-						
-						mf_configure(r.pdi);
-						mf_anticollision(t, r);
-						skip = true;
-						break;
-					}
-				}
-				if (skip) continue; // We have already revealed key, go to the next iteration
-
 				// Max probes for auth for each sector
 				for (k = 0; k < probes; ++k) {
 					// Try to authenticate to exploit sector and determine distances (filling denonce.distances)
@@ -403,9 +350,6 @@ int mfocmain(uint32_t id) {
 								mf_anticollision(t, r);
 							} else {
 								// Save all information about successfull authentization
-								bk->size++;
-								bk->brokenKeys = (uint64_t *) realloc((void *)bk->brokenKeys, bk->size * sizeof(uint64_t));
-								bk->brokenKeys[bk->size-1] = bytes_to_num(mp.mpa.abtKey, 6);
 								if (dumpKeysA) {
 									memcpy(t.sectors[j].KeyA, mp.mpa.abtKey, sizeof(mp.mpa.abtKey));
 									t.sectors[j].foundKeyA = true;
