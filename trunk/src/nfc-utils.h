@@ -62,10 +62,6 @@ extern  "C" {
  */
 #define ERR(...)
 
-inline uint8_t oddparity(const uint8_t bt) {
-	return ((~bt) & 0x1);
-}
-
 void printHex(const uint8_t * data, const uint32_t numBytes);
 void printHexChar(const uint8_t * data, const uint32_t numBytes);
 
