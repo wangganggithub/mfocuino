@@ -1,4 +1,5 @@
 #include <PN532/PN532.h>
+#include <MemoryFree/MemoryFree.h>
 
 #include "mfoc.h"
 
@@ -14,6 +15,9 @@ void setup(void) {
     
     nfc.begin();
     
+	Serial.print("Free RAM: ");
+    Serial.println(freeMemory());
+	
     uint32_t versiondata = nfc.getFirmwareVersion();
     if (! versiondata) {
         //Serial.print("Didn't find PN53x board");
