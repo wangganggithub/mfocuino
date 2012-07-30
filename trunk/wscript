@@ -226,7 +226,7 @@ def build(bld):
 	bld.add_pre_fun(buildArduinoCore)
 
 	#build arduino project
-	src = bld.path.ant_glob(['src/**/*.pde', 'src/**/*.ino', 'src/**/*.c', 'src/**/*.cpp', 'libraries/**/*.cpp'])
+	src = bld.path.ant_glob(['src/**/*.pde', 'src/**/*.ino', 'src/**/*.c', 'src/**/*.cpp', 'libraries/**/*.c', 'libraries/**/*.cpp'])
 	bld(features = 'c cxx cxxprogram',
 		includes = 'src',
 		source = src, 
