@@ -712,7 +712,7 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 	for (i = 0; i < 4; i++) {
 		// Load in, and encrypt the reader nonce (Nr)
 		ArEnc[i] = crypto1_byte(pcs, Nr[i], 0) ^ Nr[i];
-		ArEncPar[i] = filter(pcs->odd) ^ oddparity(Nr[i]);
+		ArEncPar[i] = filter(pcs->odd) ^ odd_parity(Nr[i]);
 	}
 	// Skip 32 bits in the pseudo random generator
 	Nt = prng_successor(Nt, 32);
@@ -722,7 +722,7 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 		Nt = prng_successor(Nt, 8);
 		// Encrypt the reader-answer (Nt' = suc2(Nt))
 		ArEnc[i] = crypto1_byte(pcs, 0x00, 0) ^ (Nt&0xff);
-		ArEncPar[i] = filter(pcs->odd) ^ oddparity(Nt);
+		ArEncPar[i] = filter(pcs->odd) ^ odd_parity(Nt);
 	}
 
 	// Finally we want to send arbitrary parity bits
@@ -762,7 +762,7 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 			for (i = 0; i < 4; i++) {
 		                AuthEnc[i] = crypto1_byte(pcs,0x00,0) ^ Auth[i];
                 		// Encrypt the parity bits with the 4 plaintext bytes
-                		AuthEncPar[i] = filter(pcs->odd) ^ oddparity(Auth[i]);
+                		AuthEncPar[i] = filter(pcs->odd) ^ odd_parity(Auth[i]);
 			}
 
 			// Sending the encrypted Auth command
@@ -788,13 +788,13 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 			// Again, prepare and send {At}
 			for (i = 0; i < 4; i++) {
 				ArEnc[i] = crypto1_byte(pcs, Nr[i], 0) ^ Nr[i];
-				ArEncPar[i] = filter(pcs->odd) ^ oddparity(Nr[i]);
+				ArEncPar[i] = filter(pcs->odd) ^ odd_parity(Nr[i]);
 			}
 			Nt = prng_successor(NtLast, 32);
 			for (i = 4; i < 8; i++) {
 				Nt = prng_successor(Nt, 8);
 				ArEnc[i] = crypto1_byte(pcs, 0x00, 0) ^ (Nt&0xFF);
-				ArEncPar[i] = filter(pcs->odd) ^ oddparity(Nt);
+				ArEncPar[i] = filter(pcs->odd) ^ odd_parity(Nt);
 			}
 			nfc_device_set_property_bool(r.pdi,NP_HANDLE_PARITY,false);
 			if (((res = nfc_initiator_transceive_bits(r.pdi, ArEnc, 64, ArEncPar, Rx, RxPar)) < 0) || (res != 32)) {
@@ -825,7 +825,7 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 		for (i = 0; i < 4; i++) {
 			AuthEnc[i] = crypto1_byte(pcs,0x00,0) ^ Auth[i];
 			// Encrypt the parity bits with the 4 plaintext bytes
-			AuthEncPar[i] = filter(pcs->odd) ^ oddparity(Auth[i]);
+			AuthEncPar[i] = filter(pcs->odd) ^ odd_parity(Auth[i]);
 		}
 		if (nfc_initiator_transceive_bits(r.pdi, AuthEnc, 32, AuthEncPar,Rx, RxPar) < 0) {
 			//"while requesting encrypted tag-nonce"
@@ -849,7 +849,7 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 
 		// Parity validity check
 		for (i = 0; i < 3; ++i) {
-			d->parity[i] = (oddparity(Rx[i]) != RxPar[i]);
+			d->parity[i] = (odd_parity(Rx[i]) != RxPar[i]);
 		}
 
 		// Iterate over Nt-x, Nt+x
