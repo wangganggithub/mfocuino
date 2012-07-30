@@ -63,11 +63,6 @@ typedef struct {
 } pKeys;
 
 typedef struct {
-	uint64_t        *brokenKeys;
-	int32_t         size;
-} bKeys;
-
-typedef struct {
         nfc_device    *pdi;
 } mfreader;
 
