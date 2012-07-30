@@ -34,21 +34,10 @@ uint32_t crypto1_word(struct Crypto1State*, uint32_t, int);
 uint32_t prng_successor(uint32_t x, uint32_t n);
 
 struct Crypto1State* lfsr_recovery32(uint32_t ks2, uint32_t in);
-struct Crypto1State* lfsr_recovery64(uint32_t ks2, uint32_t ks3);
 
 void lfsr_rollback(struct Crypto1State* s, uint32_t in, int fb);
 uint32_t lfsr_rollback_word(struct Crypto1State *s, uint32_t in, int fb);
 int nonce_distance(uint32_t from, uint32_t to);
-#define FOREACH_VALID_NONCE(N, FILTER, FSIZE)\
-	uint32_t __n = 0,__M = 0, N = 0;\
-	int __i;\
-	for(; __n < 1 << 16; N = prng_successor(__M = ++__n, 16))\
-		for(__i = FSIZE - 1; __i >= 0; __i--)\
-			if(BIT(FILTER, __i) ^ parity(__M & 0xFF01))\
-				break;\
-			else if(__i)\
-				__M = prng_successor(__M, (__i == 7) ? 48 : 8);\
-			else
 
 #define LF_POLY_ODD (0x29CE5C)
 #define LF_POLY_EVEN (0x870804)
