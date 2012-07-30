@@ -78,11 +78,6 @@ int mfocmain(uint32_t id) {
 	int dumpKeysA = true;
 	bool failure = false;
 	bool skip = false;
-
-	// Next default key specified as option (-k)
-	uint8_t * defKeys = NULL, *p;
-	size_t defKeys_len = 0;
-	size_t defKey_bytes_todo = defKeys_len;
 	
 	// Array with default Mifare Classic keys
 	uint8_t defaultKeys[][6] = {
@@ -210,13 +205,8 @@ int mfocmain(uint32_t id) {
 	int key = 0;
 	
 	while (key < n) {
-		if (defKey_bytes_todo > 0) {
-			memcpy(mp.mpa.abtKey, defKeys + defKeys_len - defKey_bytes_todo, sizeof(mp.mpa.abtKey));
-			defKey_bytes_todo -= sizeof(mp.mpa.abtKey);
-		} else {
-			memcpy(mp.mpa.abtKey, defaultKeys[key], sizeof(mp.mpa.abtKey));
-			key++;
-		}
+		memcpy(mp.mpa.abtKey, defaultKeys[key], sizeof(mp.mpa.abtKey));
+		key++;
 		
 		Serial.print("[Key: ");
 		printHex(mp.mpa.abtKey, 6);
