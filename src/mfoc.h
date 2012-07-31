@@ -6,7 +6,7 @@
 #define EXIT_SUCCESS	 0
 #define EXIT_FAILURE	-1
 
-#define MEM_CHUNK               10000
+#define MEM_CHUNK               3
 #define TRY_KEYS                50
 
 // Number of trailers == number of sectors
@@ -66,12 +66,6 @@ typedef struct {
         nfc_device    *pdi;
 } mfreader;
 
-typedef struct {
-        uint64_t        key;
-        int             count;
-} countKeys;
-
-
 int mfocmain(uint32_t id);
 
 int mf_init(mfreader *r);
@@ -84,9 +78,8 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 uint32_t median(denonce d);
 int compar_int(const void * a, const void * b);
 int valid_nonce(uint32_t Nt, uint32_t NtEnc, uint32_t Ks1, uint8_t * parity);
-int compar_special_int(const void * a, const void * b);
-countKeys * uniqsort(uint64_t *possibleKeys, uint32_t size);
 void num_to_bytes(uint64_t n, uint32_t len, uint8_t* dest);
 long long unsigned int bytes_to_num(uint8_t* src, uint32_t len);
+int addPossibleKey(uint64_t key, int kCount);
 
 #endif // __MFOC_H__

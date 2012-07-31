@@ -103,7 +103,6 @@ int mfocmain(uint32_t id) {
 
 	// Pointers to possible keys
 	pKeys		*pk;
-	countKeys	*ck;
 
 	static mifare_param mp;
  	static mifare_classic_tag mtDump;
@@ -325,54 +324,43 @@ int mfocmain(uint32_t id) {
 					}
 					Serial.println();
 					
-					// Get first 15 grouped keys
-					ck = uniqsort(pk->possibleKeys, pk->size);
-					for (int i = 0; i < TRY_KEYS ; i++) {
-						// We don't known this key, try to break it
-						// This key can be found here two or more times
-						if (ck[i].count > 0) {
-							
-							//Serial.print(ck[i].count, DEC);
-							//Serial.println(ck[i].key, HEX);
-														
-							// Set required authetication method
-							num_to_bytes(ck[i].key, 6, mp.mpa.abtKey);
-							mc = (mifare_cmd)(dumpKeysA ? 0x60 : 0x61);
-							if (!nfc_initiator_mifare_cmd(r.pdi,mc,t.sectors[j].trailer,&mp)) {
+					for (int i = 0; i < pk->size ; i++) {
+						// Set required authetication method
+						num_to_bytes(pk->possibleKeys[i], 6, mp.mpa.abtKey);
+						mc = (mifare_cmd)(dumpKeysA ? 0x60 : 0x61);
+						if (!nfc_initiator_mifare_cmd(r.pdi,mc,t.sectors[j].trailer,&mp)) {
 
-								//Serial.print("!!Error: AUTH [Key A:");
-								//printHex(mp.mpa.abtKey, 6);
-								//Serial.print("] sector ");
-								//Serial.print(j, HEX);
-								//Serial.print(" t_block ");
-								//Serial.println(t.sectors[j].trailer, HEX);
-								
-								mf_anticollision(t, r);
+							//Serial.print("!!Error: AUTH [Key A:");
+							//printHex(mp.mpa.abtKey, 6);
+							//Serial.print("] sector ");
+							//Serial.print(j, HEX);
+							//Serial.print(" t_block ");
+							//Serial.println(t.sectors[j].trailer, HEX);
+
+							mf_anticollision(t, r);
+						} else {
+							// Save all information about successfull authentization
+							if (dumpKeysA) {
+								memcpy(t.sectors[j].KeyA, mp.mpa.abtKey, sizeof(mp.mpa.abtKey));
+								t.sectors[j].foundKeyA = true;
+
 							} else {
-								// Save all information about successfull authentization
-								if (dumpKeysA) {
-									memcpy(t.sectors[j].KeyA, mp.mpa.abtKey, sizeof(mp.mpa.abtKey));
-									t.sectors[j].foundKeyA = true;
-
-								} else {
-									memcpy(t.sectors[j].KeyB, mp.mpa.abtKey, sizeof(mp.mpa.abtKey));
-									t.sectors[j].foundKeyB = true;
-								}
-								
-								Serial.print("Found Key:");
-								Serial.print((dumpKeysA ? 'A' : 'B'));
-								Serial.print(" ");
-								printHex(mp.mpa.abtKey, 6);
-								Serial.println();
-
-								mf_configure(r.pdi);
-								mf_anticollision(t, r);
-								break;
+								memcpy(t.sectors[j].KeyB, mp.mpa.abtKey, sizeof(mp.mpa.abtKey));
+								t.sectors[j].foundKeyB = true;
 							}
+
+							Serial.print("Found Key:");
+							Serial.print((dumpKeysA ? 'A' : 'B'));
+							Serial.print(" ");
+							printHex(mp.mpa.abtKey, 6);
+							Serial.println();
+
+							mf_configure(r.pdi);
+							mf_anticollision(t, r);
+							break;
 						}
 					}
 					free(pk->possibleKeys);
-					free(ck);
 					// Success, try the next sector
 					if ((dumpKeysA && t.sectors[j].foundKeyA) || (!dumpKeysA && t.sectors[j].foundKeyB)) break;
 				}
@@ -699,6 +687,7 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 
 	// If we are in "Get Distances" mode
 	if (mode == 'd') {
+
 		for (m = 0; m < d->num_distances; m++) {
 			// Serial.print("Nested Auth number: ");
 			// Serial.print(m, HEX);
@@ -819,15 +808,9 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 				while ((revstate->odd != 0x0) || (revstate->even != 0x0)) {
 					lfsr_rollback_word(revstate, NtProbe ^ t.authuid, 0);
 					crypto1_get_lfsr(revstate, &lfsr);
-					// Allocate a new space for keys
+					// Allocate a new space for keys (not need to allocate a lot of space)
 					if (((kcount % MEM_CHUNK) == 0) || (kcount >= pk->size)) {
 						pk->size += MEM_CHUNK;
-						
-						//Serial.print("New chunk by ");
-						//Serial.print(kcount, DEC);
-						//Serial.print("n sizeof ");
-						//Serial.println(pk->size * sizeof(uint64_t), DEC);
-						
 						pk->possibleKeys = (uint64_t *) realloc((void *)pk->possibleKeys, pk->size * sizeof(uint64_t));
 						if (pk->possibleKeys == NULL) {
 							//Memory allocation error for pk->possibleKeys
@@ -835,8 +818,9 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 							swreset();
 						}
 					}
-					pk->possibleKeys[kcount] = lfsr;
-					kcount++;
+					if(addPossibleKey(lfsr, kcount) == 2){
+						pk->possibleKeys[kcount++] = lfsr;
+					}
 					revstate++;
 				}
 				free(revstate_start);
@@ -857,6 +841,12 @@ int mf_enhanced_auth(int e_sector, int a_sector, mftag t, mfreader r, denonce *d
 	return 0;
 }
 
+// adds the key in the external RAM and returns true thenumber of occurences of the key in the RAM
+int addPossibleKey(uint64_t key, int kCount) {
+	//TODO IMPLEMENT ME
+	return 0;
+}
+
 // Return the median value from the nonce distances array
 uint32_t median(denonce d) {
 	int middle = (int) d.num_distances / 2;
@@ -874,39 +864,6 @@ uint32_t median(denonce d) {
 int compar_int(const void * a, const void * b) {
 	return (*(uint64_t*)b - *(uint64_t*)a);
 }
-
-// Compare countKeys structure
-int compar_special_int(const void * a, const void * b) {
-	return (((countKeys *)b)->count - ((countKeys *)a)->count);
-}
-
-countKeys * uniqsort(uint64_t * possibleKeys, uint32_t size) {
-	unsigned int i, j = 0;
-	int count = 0;
-	countKeys *our_counts;
-
-	qsort(possibleKeys, size, sizeof (uint64_t), compar_int);
-
-	our_counts = (countKeys*)calloc(size, sizeof(countKeys));
-	if (our_counts == NULL) {
-		ERR ("Memory allocation error for our_counts");
-		swreset();
-	}
-
-	for (i = 0; i < size; i++) {
-        if (possibleKeys[i+1] == possibleKeys[i]) {
-			count++;
-		} else {
-			our_counts[j].key = possibleKeys[i];
-			our_counts[j].count = count;
-			j++;
-			count=0;
-		}
-	}
-	qsort(our_counts, j, sizeof(countKeys), compar_special_int);
-	return (our_counts);
-}
-
 
 // Return 1 if the nonce is invalid else return 0
 int valid_nonce(uint32_t Nt, uint32_t NtEnc, uint32_t Ks1, uint8_t * parity) {
