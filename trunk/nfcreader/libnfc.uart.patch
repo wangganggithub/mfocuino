@@ -2,20 +2,10 @@ Index: libnfc/chips/pn53x.c
 ===================================================================
 --- libnfc/chips/pn53x.c	(révision 1447)
 +++ libnfc/chips/pn53x.c	(copie de travail)
-@@ -997,6 +997,17 @@
+@@ -997,6 +997,7 @@
    size_t szRx = sizeof(abtRx);
    int res = 0;
  
-+      
-+  //arduino start sequence ...
-+  /*uint8_t Ardu[4] = { 0x41, 0x72, 0x64, 0x75 };
-+  for(int i = 0; i < 4; i++){
-+      uint8_t arducheck = 0;
-+      while(arducheck != Ardu[i]){
-+        uart_receive(DRIVER_DATA(pnd)->port, &arducheck, 1, 0, 0);
-+        //fprintf(stderr,"%s %s:%d my check res=%d buf= 0x%x\n", __FILE__, __FUNCTION__, __LINE__, myres, arducheck);
-+      }
-+  }*/
 +  sleep(7);
    if ((res = pn53x_transceive(pnd, abtCmd, sizeof(abtCmd), abtRx, szRx, 500)) < 0)
      return res;
